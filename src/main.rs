@@ -38,10 +38,13 @@ async fn main() {
     dotenv().ok();  
 
     // 从环境变量中获取日志级别，如果没有设置则默认为info
-    let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_|"info".to_string());
+    // let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_|"info".to_string());
+    let log_level = "info".to_string();
+
     init_log(log_level).await;//日志初始化
     
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");//获取数据库连接地址
+    // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");//获取数据库连接地址
+    let database_url = "mysql://root:root@localhost:3306/rust_sqlx_example".to_string();
     let pool = init_pool(&database_url).await.expect("Cannot init the database pool");//连接池初始化
     info!("Started processing request");
     let app = Router::new()
@@ -64,7 +67,8 @@ async fn main() {
     .layer(Extension(pool)); // 将连接池添加到应用程序中
 
     //获取端口号，如果没有设置则默认为3000
-    let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    // let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let port = "3000".to_string();
     let addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     info!("Started server at {}",port);
