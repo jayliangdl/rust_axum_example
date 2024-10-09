@@ -18,6 +18,10 @@ pub mod request_models{
     pub struct HealthCheck{
         pub text: String,
     }
+    #[derive(Deserialize)]
+    pub struct EnvVariable{
+        pub text: String,
+    }
 }
 
 pub mod response_models{
@@ -31,6 +35,11 @@ pub mod response_models{
     #[derive(Serialize,Debug)]
     pub struct HealthCheck{
         pub text: String,
+    }
+
+    #[derive(Serialize,Debug)]
+    pub struct EnvVariable{
+        pub value: String,
     }
 }
 
