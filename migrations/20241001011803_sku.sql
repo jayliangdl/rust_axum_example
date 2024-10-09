@@ -37,3 +37,8 @@ create table if not exists co_sku_channel(
     `create_date_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `update_date_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB AUTO_INCREMENT=95 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+create table if not exists users(
+    name varchar(50) not null,
+    age int not null
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
