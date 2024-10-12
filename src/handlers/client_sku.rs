@@ -12,7 +12,6 @@ use crate::model::request::frontend::find_sku::FindSku as RequestFrontFindSku;
 
 use crate::models::ApiResponse;
 use hyper::header::CONTENT_TYPE;
-use tracing::info;
 use crate::cache::{CACHE,CacheType};
 use crate::cache::key::get_service_list_key;
 
