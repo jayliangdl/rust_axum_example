@@ -43,8 +43,8 @@ pub mod response_models{
     }
 }
 
-use serde::Serialize;
-#[derive(Serialize,Debug)]
+use serde::{Deserialize, Serialize};
+#[derive(Serialize,Debug,Deserialize)]
 #[serde(tag="result")]
 pub enum ApiResponse<T>{
     SUCCESS{
@@ -72,6 +72,46 @@ impl ErrorResponse{
         };
         api_response
 
+    }
+}
+
+
+pub mod nacos_models{
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+    #[derive(Serialize, Deserialize, Clone,Debug)]
+    pub struct NacosInstance {
+        pub ip: String,
+        pub port: u16,
+        #[serde(rename = "serviceName")]
+        pub service_name: String,
+        pub weight: f64,
+        pub enable: bool,
+        pub healthy: bool,
+        pub ephemeral: bool,
+        pub metadata: Option<HashMap<String, String>>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone,Debug)]
+    pub struct NacosService {
+        pub name: String,
+        #[serde(rename = "groupName")]
+        pub group_name: String,
+        pub clusters: String,
+        #[serde(rename = "namespaceId")]
+        pub namespace_id: String,
+        pub instances: Option<Vec<NacosInstance>>,
+    }
+
+    #[derive(Serialize, Clone)]
+    pub struct DeregisterParams {
+        pub ip: String,
+        pub port: u16,
+        #[serde(rename = "serviceName")]
+        pub service_name: String,
+        pub cluster: String,
+        #[serde(rename = "namespaceId")]
+        pub namespace_id: String,
     }
 }
 

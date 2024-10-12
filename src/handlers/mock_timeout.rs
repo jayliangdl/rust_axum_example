@@ -6,7 +6,7 @@ use axum::{
 use tokio::time::sleep;
 use std::time::Duration;
 use tracing::info;
-use crate::Uuid;
+use uuid::Uuid;
 
 #[instrument(name = "mock_timeout", skip(payload),fields(request_id = %Uuid::new_v4()))]
 pub async fn mock_timeout(

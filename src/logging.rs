@@ -16,6 +16,8 @@ pub async fn init_log(log_level:String) {
     let console_subscriber = tracing_subscriber::fmt::layer()
         .with_writer(io::stdout)
         .with_ansi(false)
+        .with_file(true)
+        .with_line_number(true)
         // .with_filter(LevelFilter::INFO);
         .with_filter(console_env_filter);
 
@@ -32,6 +34,8 @@ pub async fn init_log(log_level:String) {
     let file_subscriber = tracing_subscriber::fmt::layer()
         .with_writer(log_file)        
         .with_ansi(false)
+        .with_line_number(true)
+        .with_file(true)
         // .with_filter(LevelFilter::INFO);
         .with_filter(file_env_filter);
 

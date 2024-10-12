@@ -6,14 +6,17 @@ use std::time::Instant;
 use tracing::instrument;
 use tracing::trace;
 use uuid::Uuid;
+
+use crate::models::nacos_models::NacosService;
+
 #[derive(Clone,Debug)]
 pub enum CacheType {
     Str(String),
     I32(i32),
+    DateTime(String),
     Sku(Option<crate::model::db::sku::Sku>),
+    NacosService(NacosService),
 }
-
-
 
 // 定义一个全局的、懒加载的缓存实例
 pub static CACHE: Lazy<Cache<String, (Expiration,CacheType)>> = Lazy::new(|| {
@@ -36,7 +39,8 @@ pub enum Expiration {
     /// The value expires after a short time. (5 seconds in this example)
     AfterShortTime,
     /// The value expires after a long time. (15 seconds in this example)
-    AfterLongTime,
+    AfterLongTime,   
+    Second5, 
 }
 
 impl Expiration {
@@ -46,6 +50,7 @@ impl Expiration {
             Expiration::Never => None,
             Expiration::AfterShortTime => Some(Duration::from_secs(5)),
             Expiration::AfterLongTime => Some(Duration::from_secs(15)),
+            Expiration::Second5=>Some(Duration::from_secs(5)),
         }
     }
 }
@@ -68,6 +73,29 @@ impl Expiry<String, (Expiration, CacheType)> for MyExpiry {
         let duration = value.0.as_duration();
         tracing::info!("MyExpiry: expire_after_create called with key {_key} and value {value:?}. Returning {duration:?}.");
         duration
+    }
+
+    /// 设置更新后的缓存项的过期时间
+    #[instrument(name = "cache.expire_after_update", skip_all)]
+    fn expire_after_update(
+        &self,
+        _key: &String,
+        value: &(Expiration, CacheType),
+        _current_time: Instant,
+        _druation: Option<Duration>,
+    ) -> Option<Duration> {
+        let duration = value.0.as_duration();
+        tracing::info!(
+            "MyExpiry: expire_after_update called with key `{}` and value {:?}. Returning {:?}.",
+            _key, value, duration
+        );
+        duration
+    }
+}
+
+pub mod key{
+    pub fn get_service_list_key(service_name_clone:String) -> String {
+        format!("{}:{}","nacos_service_list:",&service_name_clone)
     }
 }
 
