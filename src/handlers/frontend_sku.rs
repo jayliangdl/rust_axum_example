@@ -10,7 +10,7 @@ use crate::model::response::frontend::find_sku::FindSku as ResponseFrontendFindS
 
 use crate::models::ApiResponse;
 use crate::dao::sku_dao::SkuDao;
-use crate::cache::{CACHE,CacheType,Expiration};
+use crate::utils::cache::{CACHE,CacheType,Expiration};
 
 #[instrument(name = "find_sku", fields(request_id = %Uuid::new_v4()))]
 pub async fn find_sku(
@@ -22,10 +22,10 @@ pub async fn find_sku(
 
     if let Some((_,CacheType::Sku(sku_option))) = CACHE.get(&key){
         let sku_option = ResponseFrontendFindSku::from_db_sku(sku_option);
-        tracing::info!("Cache hit");
+        tracing::trace!("Cache hit");
         return Ok((StatusCode::OK,Json(ApiResponse::SUCCESS { data: sku_option })));
     }else{
-        tracing::info!("Cache miss");
+        tracing::trace!("Cache miss");
         if let Ok(sku_option) = SkuDao::find_sku(&pool, sku_code).await{
             let sku_response: Option<ResponseFrontendFindSku> = ResponseFrontendFindSku::from_db_sku(sku_option.clone());
             let cache_type_with_sku: CacheType = CacheType::Sku(sku_option);

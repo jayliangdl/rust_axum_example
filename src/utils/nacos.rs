@@ -1,7 +1,6 @@
-use bigdecimal::ToPrimitive;
 use hyper::{Body, Client, Method, Request};
 use hyper::header::CONTENT_TYPE;
-use serde_json::{json,Value};
+use serde_json::json;
 use tracing::{trace,info,error};
 use std::error::Error;
 use std::vec;
@@ -10,9 +9,6 @@ use std::collections::HashMap;
 use uuid::Uuid;
 use tokio::time::{sleep, Duration};
 use crate::models::nacos_models::{DeregisterParams, NacosService};
-use crate::cache::{CacheType, Expiration, CACHE};
-use crate::models::nacos_models::NacosInstance;
-use crate::services_dependence::get_services_dependence_list;
 // 向Nacos注册服务
 async fn register_service_hyper(nacos_url: &str, service: &NacosService) -> Result<(), Box<dyn Error>> {
     //检查service是否为空，为空则返回错误
@@ -253,89 +249,10 @@ pub async fn start_nacos(
 }
 
 // 定义一个结构体来管理 Nacos 的注销信号和任务句柄
+
 pub struct NacosHandle {
     pub shutdown: oneshot::Sender<()>,
     pub join_handle: tokio::task::JoinHandle<()>,
-}
-
-//从Nacos中获取服务实例列表
-async fn get_service_instances(nacos_url: &str, service_name: &str, group_name: &str, namespace_id: &str) -> Result<NacosService, Box<dyn Error>> {
-    let client = Client::new();
-    let uri = format!("{}/nacos/v1/ns/instance/list?serviceName={}&groupName={}&namespaceId={}", nacos_url, service_name, group_name, namespace_id)
-        .parse::<hyper::Uri>()
-        .map_err(|e| format!("Failed to parse URI: {}", e))?;
-    // info!("uri: {}", uri);
-    let req = Request::builder()
-        .method(Method::GET)
-        .uri(uri)
-        .body(Body::empty())?;
-    // info!("Request: {:?}", req);
-    let res = client.request(req).await?;
-    // info!("Response: {:?}", res);
-    let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
-    let body_str = String::from_utf8_lossy(&body_bytes);
-    info!("body_str: {:?}", body_str);
-    let services: Value = serde_json::from_str(&body_str)?;
-    info!("services: {:?}", services.clone());
-    if let Value::Object(map) = services.clone() {
-        let hash_map: HashMap<String, Value> = map.into_iter().collect();
-        let mut nacos_service = NacosService{
-            name: hash_map.get("name").unwrap_or(&Value::String("".to_string())).as_str().unwrap().to_string(),  
-            group_name: hash_map.get("groupName").unwrap_or(&Value::String("".to_string())).as_str().unwrap().to_string(),  
-            clusters: hash_map.get("clusters").unwrap_or(&Value::String("".to_string())).as_str().unwrap().to_string(),  
-            namespace_id: hash_map.get("namespaceId").unwrap_or(&Value::String("".to_string())).as_str().unwrap().to_string(),  
-            instances: None,
-        };
-
-        let mut instances = vec![];
-        if hash_map.contains_key("hosts"){
-            let hosts = hash_map.get("hosts").unwrap().as_array().unwrap();
-            for host in hosts {
-                let nacos_instance = NacosInstance{
-                    ip: host.get("ip").unwrap_or(&Value::String("".to_string())).as_str().unwrap().to_string(),  
-                    port: host.get("port").unwrap_or(&Value::Number(0.into())).as_u64().unwrap() as u16,  
-                    service_name: nacos_service.name.clone(),
-                    weight: host.get("weight").unwrap_or(&Value::Number(1.into())).as_f64().unwrap().to_f64().unwrap(),
-                    enable: host.get("enable").unwrap_or(&Value::Bool(true)).as_bool().unwrap(),
-                    healthy: host.get("healthy").unwrap_or(&Value::Bool(true)).as_bool().unwrap(),
-                    ephemeral: host.get("ephemeral").unwrap_or(&Value::Bool(true)).as_bool().unwrap(),
-                    metadata: None,
-                };
-                instances.push(nacos_instance);
-            }
-            nacos_service.instances = Some(instances);
-        }
-        Ok(nacos_service)
-    }else{
-        Err("Failed to get service instances".into())
-    }
-    
-}
-
-//应用启动时，获取本应用（作为客户端）关心的服务器端服务，启动一个独立的线程，每10秒从Nacos中获取一次服务实例列表
-pub async fn start_nacos_watch(nacos_url: &str, group_name: &str, namespace_id: &str) -> Result<(), Box<dyn Error>> {
-    let services_dependence_list = get_services_dependence_list();
-    let nacos_url_clone = nacos_url.to_string();
-    let group_name_clone = group_name.to_string();
-    let namespace_id_clone = namespace_id.to_string();
-    tokio::spawn(async move {
-        loop {
-            for service_name in &services_dependence_list {
-                let service_name_clone = service_name.clone();                
-                if let Ok(service) = get_service_instances(&nacos_url_clone, &service_name_clone, &group_name_clone, &namespace_id_clone).await {
-                    //将获取到的服务实例列表存储到本地缓存中
-                    let cache_type_with_nacos_service_list: CacheType = CacheType::NacosService(service.clone());
-                    // info!("Service instances: {:?}", services.clone());
-                    let key = crate::cache::key::get_service_list_key(service_name_clone);
-                    CACHE.insert(key.clone(), (Expiration::Second5,cache_type_with_nacos_service_list));
-                } else {
-                    error!("Failed to get service instances");
-                }
-            }
-            sleep(Duration::from_secs(2)).await;
-        }
-    });
-    Ok(())
 }
 
 

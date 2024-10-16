@@ -1,61 +1,156 @@
-extern crate rust_axum_example;
-use rust_axum_example::nacos;
-use rust_axum_example::nacos::start_nacos_watch;
+use std::sync::{atomic::AtomicBool, Arc};
+use tokio::sync::Notify;
 use axum::{
     error_handling::HandleErrorLayer, http::StatusCode, routing::{get, post}, BoxError, Extension, Router
 };
-
 use std::time::Duration;
 use tower::limit::ConcurrencyLimitLayer;
 use tower_http::trace::TraceLayer;
 use tower::ServiceBuilder;
-use tracing::{info,error};
-use std::env; 
+use tracing::{info, error};
+use std::env;
 use dotenv::dotenv;
+use rust_axum_example::utils::load_balance::fetch_load_balance_from_nacos;
+use rust_axum_example::utils::nacos;
+use rust_axum_example::utils::logging::init_log;
+use rust_axum_example::utils::db::init_pool;
+use rust_axum_example::utils::request_counter::request_counter_middleware;
 
-use rust_axum_example::logging::init_log;
-use rust_axum_example::db::init_pool;
+// use axum::middleware::Next;
+// use axum::http::{Request,Response};
+// use axum::body::Body;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rust_axum_example::handlers::{
-    health_check::{health_check,env_variable},    
+    health_check::{health_check, env_variable},    
     mock_timeout::mock_timeout,
     create_user::create_user,
-    operation_sku::{create_sku,update_sku,find_sku},
+    operation_sku::{create_sku, update_sku, find_sku},
     frontend_sku::find_sku as front_find_sku,
     client_sku::find_sku as client_find_sku,
 };
 
-
 #[tokio::main]
 async fn main() {    
-    // 加载环墶变量
+    // 加载环境变量
     dotenv().ok();  
 
-    // 从环境变量中获取日志级别，如果没有设置则默认为info
+    // 获取日志级别并初始化日志
     let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_|"info".to_string());
-    // let log_level = "info".to_string();
-    info!("log_level:{}",log_level);
-    init_log(log_level).await;//日志初始化
+    info!("log_level:{}", log_level);
+    init_log(log_level).await; // 日志初始化
     
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");//获取数据库连接地址
-    // let database_url = "mysql://root:root@localhost:3306/rust_sqlx_example".to_string();
-    
-    //获取端口号，如果没有设置则默认为3000
-    let port = env::var("PORT_SET_WHEN_RUN").unwrap_or_else(|_| env::var("PORT").unwrap_or_else(|_| "3000".to_string()));
-    // let port = "3002".to_string();
-    let port_num = port.parse::<u16>().expect("PORT must be a number");//端口号转换为u16类型
-
-    let pool = init_pool(&database_url).await.expect("Cannot init the database pool");//连接池初始化
-    info!("Started processing request");
+    // 获取数据库连接地址并初始化连接池
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");
+    let pool = init_pool(&database_url).await.expect("Cannot init the database pool");
 
     // Nacos 配置
     let nacos_url = env::var("NACOS_URL").unwrap_or_else(|_| "http://localhost:8848".to_string());
-    let service_name = env::var("SERVICE_NAME").unwrap_or_else(|_| "my_rust_service".to_string());
+    let service_name = env::var("SERVICE_NAME_WHEN_RUN")
+        .unwrap_or_else(|_| env::var("SERVICE_NAME").unwrap_or_else(|_| "my_rust_service".to_string()));
     let group_name = env::var("GROUP_NAME").unwrap_or_else(|_| "DEFAULT_GROUP".to_string());
     let namespace_id = env::var("NAMESPACE_ID").unwrap_or_else(|_| "public".to_string());
     let ip = env::var("SERVICE_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("PORT_SET_WHEN_RUN")
+        .unwrap_or_else(|_| env::var("PORT").unwrap_or_else(|_| "3000".to_string()));
+    let port_num = port.parse::<u16>().expect("PORT must be a number");
 
-    // 启动 Nacos 管理器
+
+    // 从 Nacos 中获取其他微服务的实例列表，并添加到缓存中（每3秒从 Nacos 中刷新一次）
+    let _ = fetch_load_balance_from_nacos().await;
+
+    // 创建一个 Notify 实例，用于通知主任务服务器已准备好
+    let notify_1 = Arc::new(Notify::new());
+    let notify_2 = notify_1.clone();
+
+    // 创建一个 Notify 实例，用于通知服务器关闭
+    let shutdown_notify_1 = Arc::new(Notify::new());
+    let shutdown_notify_2 = shutdown_notify_1.clone();
+
+    // 创建一个全局的请求计数器
+    let request_counter = Arc::new(AtomicUsize::new(0));
+    let is_shutting_down = Arc::new(AtomicBool::new(false));
+
+    // 打印正在处理的请求数量
+    // let request_counter_clone = Arc::clone(&request_counter);
+    // tokio::spawn(log_request_count(port_num.clone(),request_counter_clone));
+
+    // 创建 API 路由
+    let app = Router::new()
+        .route("/health_check", get(health_check))
+        .route("/env_variable", get(env_variable))
+        .route("/mock_timeout", post(mock_timeout))
+        .route("/create_user", post(create_user))
+        .route("/operation/create_sku", post(create_sku))
+        .route("/operation/update_sku", post(update_sku))
+        .route("/operation/find_sku", post(find_sku))
+        .route("/frontend/find_sku", post(front_find_sku))
+        .route("/client/find_sku", post(client_find_sku))
+        .layer(TraceLayer::new_for_http()) // 添加日志记录中间件
+        .layer(ConcurrencyLimitLayer::new(100)) // 限制并发请求数量
+        .layer(
+            ServiceBuilder::new()
+                // timeout will produce an error if the handler takes too long so we must handle those
+                .layer(HandleErrorLayer::new(handle_timeout_error))
+                .timeout(Duration::from_secs(3)) // 设置超时时间
+        )
+        
+        .layer(
+            ServiceBuilder::new()
+                // 添加请求计数器中间件
+                .layer(Extension(request_counter.clone())) // 将计数器添加到 Extension 中
+                .layer(Extension(is_shutting_down.clone())) // 将计数器添加到 Extension 中
+                .layer(axum::middleware::from_fn(request_counter_middleware))
+        )
+    //     .layer(
+    // ServiceBuilder::new().layer(axum::middleware::from_fn(
+    //     {
+    //         let request_counter = request_counter.clone();
+    //         move |req: Request<axum::body::Body>, next: Next<>| {
+    //             let counter = request_counter.clone();
+    //             async move {
+    //                 // 请求进入时，增加计数器
+    //                 counter.fetch_add(1, Ordering::SeqCst);
+    //                 info!("Request count: {}", counter.load(Ordering::SeqCst));
+    //                 let response = next.run(req).await;
+    //                 // 请求完成时，减少计数器
+    //                 counter.fetch_sub(1, Ordering::SeqCst);
+    //                 response
+    //             }
+    //         }
+    //     },
+    //     )))
+        .layer(Extension(pool)); // 将连接池添加到应用程序中
+
+    
+
+    // 绑定监听器
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    info!("Bound to {}", addr);
+
+    // 启动 Web 服务器任务
+    let server_handle = {
+        tokio::spawn(async move {
+            // 使用 axum::serve_with_shutdown 来启动服务器
+            let server = axum::serve(listener, app)
+                .with_graceful_shutdown(async move {
+                    shutdown_notify_2.notified().await
+            });
+    
+            // 启动服务器前通知主任务
+            notify_2.notify_one();
+    
+            // 启动服务器
+            server.await.unwrap();
+        })
+    };
+
+    // 等待服务器启动的通知
+    notify_1.notified().await;
+    info!("Server is up and running on {}", addr);
+
+    // 向 Nacos 注册本应用实例
     let nacos_handle = nacos::start_nacos(
         &nacos_url,
         &service_name,
@@ -65,17 +160,8 @@ async fn main() {
         port_num,
     ).await.expect("Failed to start Nacos manager");
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    // nacos_url: &str, service_name: &str, group_name: &str, namespace_id: &str
-    let _ = start_nacos_watch(&nacos_url, &group_name, &namespace_id).await;
-    // //sleep 5s
-    // tokio::time::sleep(Duration::from_secs(5)).await;
-    // // 获取服务实例
-    // let _ = get_service_instances(&nacos_url, &service_name, &group_name, &namespace_id).await;
-
-
     // 定义优雅关闭信号，监听 SIGINT 和 SIGTERM
-    let shutdown_signal = async {
+    let shutdown_handle = tokio::spawn(async move {
         // 创建一个新的信号监听器，监听 SIGINT 和 SIGTERM
         #[cfg(unix)]
         {
@@ -99,64 +185,37 @@ async fn main() {
                 .expect("Failed to install Ctrl+C handler");
             info!("Received Ctrl+C");
         }
-
+        info!("本实例正在关闭");
+        is_shutting_down.store(true, Ordering::SeqCst);  
         // 发送注销信号给 Nacos
         if let Err(e) = nacos_handle.shutdown.send(()) {
             error!("Failed to send shutdown signal to Nacos: {:?}", e);
         }
-    };
 
+        // 等待 Nacos 任务完成
+        if let Err(e) = nacos_handle.join_handle.await {
+            error!("Nacos task failed: {:?}", e);
+        }    
+        
+        // 等待所有请求完成
+        loop{
+            // 检查请求计数器是否为 0
+            if request_counter.load(Ordering::SeqCst) == 0 {
+                info!("All requests are completed");
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+                   
+        // 发送关闭信号给服务器
+        shutdown_notify_1.notify_one();
+    });
 
-    let app = Router::new()
-    .route("/health_check", get(health_check))
-    .route("/env_variable", get(env_variable))
-    .route("/mock_timeout", post(mock_timeout))
-    .route("/create_user", post(create_user))
-    .route("/operation/create_sku", post(create_sku))
-    .route("/operation/update_sku", post(update_sku))
-    .route("/operation/find_sku", post(find_sku))
-    .route("/frontend/find_sku", post(front_find_sku))
-    .route("/client/find_sku", post(client_find_sku))
-    .layer(TraceLayer::new_for_http())// 添加日志记录中间件
-    .layer(ConcurrencyLimitLayer::new(100)) // 限制并发请求数量
-    .layer(
-        ServiceBuilder::new()
-        // timeout will produce an error if the handler takes
-        // too long so we must handle those
-        .layer(HandleErrorLayer::new(handle_timeout_error))
-        .timeout(Duration::from_secs(3))// 设置超时时间
-    )
-    .layer(Extension(pool)); // 将连接池添加到应用程序中
+    // 等待服务器任务和关闭任务完成
+    let _ = tokio::join!(server_handle, shutdown_handle);
 
-    
-
-    let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    info!("Started server at {}",port);
-    axum::serve(listener, app)
-    .with_graceful_shutdown(shutdown_signal)
-    .await
-    .unwrap();
-
-    // 等待 Nacos 任务完成
-    if let Err(e) = nacos_handle.join_handle.await {
-        error!("Nacos task failed: {:?}", e);
-    }
     info!("Application shutdown complete");
-
-    
 }
-
-// // 定义优雅关闭的信号处理
-// #[instrument(name = "shutdown_signal", fields(request_id = %Uuid::new_v4()))]
-// #[allow(dead_code)]
-// async fn shutdown_signal() {
-//     // 等待 Ctrl+C 信号
-//     tokio::signal::ctrl_c()
-//         .await
-//         .expect("Failed to install Ctrl+C handler");
-//     info!("Shutdown signal received");
-// }
 
 async fn handle_timeout_error(err: BoxError) -> (StatusCode, String) {
     if err.is::<tower::timeout::error::Elapsed>() {
@@ -172,9 +231,10 @@ async fn handle_timeout_error(err: BoxError) -> (StatusCode, String) {
     }
 }
 
-
-
-
-
-
-
+#[allow(dead_code)]
+async fn log_request_count(port: u16, request_counter_clone:Arc<AtomicUsize>){
+    loop{
+        error!("port: {}, Request count: {}", port, request_counter_clone.load(Ordering::SeqCst));
+        tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+}

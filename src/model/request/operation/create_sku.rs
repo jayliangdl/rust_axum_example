@@ -9,7 +9,7 @@ use crate::model::db::sku::{
 };
 use crate::model::request::operation::price::Price;
 use crate::models::ApiResponse;
-use crate::error::ErrorCode;
+use crate::utils::error::ErrorCode;
 use sqlx::MySqlPool;
 use crate::model::response::operation::create_sku::CreateSku as ResponseCreateSku;
 use crate::models::ErrorResponse;

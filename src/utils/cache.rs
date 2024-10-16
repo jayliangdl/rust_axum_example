@@ -6,8 +6,9 @@ use std::time::Instant;
 use tracing::instrument;
 use tracing::trace;
 use uuid::Uuid;
+use std::sync::Arc;
 
-use crate::models::nacos_models::NacosService;
+use super::load_balance::LoadBalance;
 
 #[derive(Clone,Debug)]
 pub enum CacheType {
@@ -15,7 +16,7 @@ pub enum CacheType {
     I32(i32),
     DateTime(String),
     Sku(Option<crate::model::db::sku::Sku>),
-    NacosService(NacosService),
+    LoadBalance(Arc<LoadBalance>),
 }
 
 // 定义一个全局的、懒加载的缓存实例
@@ -49,7 +50,7 @@ impl Expiration {
         match self {
             Expiration::Never => None,
             Expiration::AfterShortTime => Some(Duration::from_secs(5)),
-            Expiration::AfterLongTime => Some(Duration::from_secs(15)),
+            Expiration::AfterLongTime => Some(Duration::from_secs(1500)),
             Expiration::Second5=>Some(Duration::from_secs(5)),
         }
     }
@@ -71,7 +72,7 @@ impl Expiry<String, (Expiration, CacheType)> for MyExpiry {
         _current_time: Instant,
     ) -> Option<Duration> {
         let duration = value.0.as_duration();
-        tracing::info!("MyExpiry: expire_after_create called with key {_key} and value {value:?}. Returning {duration:?}.");
+        tracing::trace!("MyExpiry: expire_after_create called with key {_key} and value {value:?}. Returning {duration:?}.");
         duration
     }
 
@@ -85,7 +86,7 @@ impl Expiry<String, (Expiration, CacheType)> for MyExpiry {
         _druation: Option<Duration>,
     ) -> Option<Duration> {
         let duration = value.0.as_duration();
-        tracing::info!(
+        tracing::trace!(
             "MyExpiry: expire_after_update called with key `{}` and value {:?}. Returning {:?}.",
             _key, value, duration
         );
@@ -96,6 +97,10 @@ impl Expiry<String, (Expiration, CacheType)> for MyExpiry {
 pub mod key{
     pub fn get_service_list_key(service_name_clone:String) -> String {
         format!("{}:{}","nacos_service_list:",&service_name_clone)
+    }
+    pub fn get_service_instance_key(service_name:String)->String{
+        let key=format!("load_balance_{}",&service_name);
+        key
     }
 }
 

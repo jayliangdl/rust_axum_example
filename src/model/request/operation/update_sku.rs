@@ -11,7 +11,7 @@ use crate::model::db::sku::{
     Sku as DbSku
 };
 use crate::dao::sku_dao::SkuDao;
-use crate::error::ErrorCode;
+use crate::utils::error::ErrorCode;
 use crate::model::response::operation::update_sku::UpdateSku as ResponseUpdateSku;
 use crate::models::ApiResponse;
 use crate::models::ErrorResponse;

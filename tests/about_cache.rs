@@ -2,11 +2,11 @@ extern crate rust_axum_example;
 
 #[cfg(test)]
 mod test{
-    use rust_axum_example::cache::CACHE;
+    use rust_axum_example::utils::cache::CACHE;
     use tracing::{info, Level};    
     use tracing_subscriber;
     use std::sync::Once;
-    use rust_axum_example::cache::{CacheType,Expiration};
+    use rust_axum_example::utils::cache::{CacheType,Expiration};
     use chrono::prelude::*;
     static INIT: Once = Once::new();
     fn init_tracing(){
