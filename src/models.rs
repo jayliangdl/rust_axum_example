@@ -48,6 +48,11 @@ use serde::{Deserialize, Serialize};
 #[serde(tag="result")]
 pub enum ApiResponse<T>{
     SUCCESS{
+        code:String,
+        msg:String,
+        #[serde(rename = "requestId")]
+        request_id:String,
+        success:bool,
         data:T
     },
     ERROR{
@@ -55,6 +60,20 @@ pub enum ApiResponse<T>{
         error_message:String,
         error_parameters:Option<serde_json::Value>,
     },
+}
+
+
+
+impl<T> ApiResponse<T>{
+    pub fn success(data:T)->ApiResponse<T>{
+        ApiResponse::SUCCESS{
+            code:"0".to_string(),
+            msg:"success".to_string(),
+            request_id:uuid::Uuid::new_v4().to_string(),
+            success:true,
+            data
+        }
+    }
 }
 
 pub struct  ErrorResponse{

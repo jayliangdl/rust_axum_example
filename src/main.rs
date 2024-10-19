@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, Arc};
 use tokio::sync::Notify;
 use axum::{
-    error_handling::HandleErrorLayer, http::StatusCode, routing::{get, post}, BoxError, Extension, Router
+    error_handling::HandleErrorLayer, http::StatusCode, BoxError, Extension, 
 };
 use std::time::Duration;
 use tower::limit::ConcurrencyLimitLayer;
@@ -10,31 +10,20 @@ use tower::ServiceBuilder;
 use tracing::{info, error};
 use std::env;
 use dotenv::dotenv;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use rust_axum_example::utils::load_balance::fetch_load_balance_from_nacos;
 use rust_axum_example::utils::nacos;
 use rust_axum_example::utils::logging::init_log;
 use rust_axum_example::utils::db::init_pool;
 use rust_axum_example::utils::request_counter::request_counter_middleware;
-
-// use axum::middleware::Next;
-// use axum::http::{Request,Response};
-// use axum::body::Body;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use rust_axum_example::handlers::{
-    health_check::{health_check, env_variable},    
-    mock_timeout::mock_timeout,
-    create_user::create_user,
-    operation_sku::{create_sku, update_sku, find_sku},
-    frontend_sku::find_sku as front_find_sku,
-    client_sku::find_sku as client_find_sku,
-};
+use rust_axum_example::utils::request_loging::print_request_response;
+use rust_axum_example::routes::app_router;
 
 #[tokio::main]
 async fn main() {    
     // 加载环境变量
     dotenv().ok();  
-
     // 获取日志级别并初始化日志
     let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_|"info".to_string());
     info!("log_level:{}", log_level);
@@ -76,16 +65,7 @@ async fn main() {
     // tokio::spawn(log_request_count(port_num.clone(),request_counter_clone));
 
     // 创建 API 路由
-    let app = Router::new()
-        .route("/health_check", get(health_check))
-        .route("/env_variable", get(env_variable))
-        .route("/mock_timeout", post(mock_timeout))
-        .route("/create_user", post(create_user))
-        .route("/operation/create_sku", post(create_sku))
-        .route("/operation/update_sku", post(update_sku))
-        .route("/operation/find_sku", post(find_sku))
-        .route("/frontend/find_sku", post(front_find_sku))
-        .route("/client/find_sku", post(client_find_sku))
+    let app = app_router()
         .layer(TraceLayer::new_for_http()) // 添加日志记录中间件
         .layer(ConcurrencyLimitLayer::new(100)) // 限制并发请求数量
         .layer(
@@ -93,8 +73,7 @@ async fn main() {
                 // timeout will produce an error if the handler takes too long so we must handle those
                 .layer(HandleErrorLayer::new(handle_timeout_error))
                 .timeout(Duration::from_secs(3)) // 设置超时时间
-        )
-        
+        )        
         .layer(
             ServiceBuilder::new()
                 // 添加请求计数器中间件
@@ -102,6 +81,12 @@ async fn main() {
                 .layer(Extension(is_shutting_down.clone())) // 将计数器添加到 Extension 中
                 .layer(axum::middleware::from_fn(request_counter_middleware))
         )
+        .layer(
+            ServiceBuilder::new()
+                // 添加打印请求和响应日志的中间件
+                .layer(axum::middleware::from_fn(print_request_response))
+        )
+
     //     .layer(
     // ServiceBuilder::new().layer(axum::middleware::from_fn(
     //     {

@@ -2,6 +2,8 @@ use tracing::info;
 use tracing::instrument;
 use axum::Extension;
 use sqlx::mysql::MySqlPool;
+use axum_extra::TypedHeader;
+use headers::UserAgent;
 use axum::{
     http::StatusCode, Json
 };
@@ -77,7 +79,7 @@ pub async fn create_sku(
     let response = ResponseCreateSku{
         sku_code: request.sku_code,
     };
-    Ok((StatusCode::OK, Json(ApiResponse::SUCCESS { data: response })))
+    Ok((StatusCode::OK, Json(ApiResponse::success ( response ))))
 }
 
 #[instrument(name = "update_sku", fields(request_id = %Uuid::new_v4()))]
@@ -116,23 +118,24 @@ pub async fn update_sku(
 
     info!("Updated SKU : {:?}", &request);
 
-    let response: ApiResponse<ResponseUpdateSku> = ApiResponse::SUCCESS { 
-        data: ResponseUpdateSku
-        {
-            sku_code: request.sku_code
-        }
+    let data = ResponseUpdateSku
+    {
+        sku_code: request.sku_code,
     };
+    let response: ApiResponse<ResponseUpdateSku> = ApiResponse::success ( data );
     Ok((StatusCode::OK, Json(response)))
 }
 
 #[instrument(name = "find_sku", fields(request_id = %Uuid::new_v4()))]
 pub async fn find_sku(
+    TypedHeader(headers): TypedHeader<UserAgent>,
     Extension(pool): Extension<MySqlPool>,
     Json(request): Json<RequestFindSku>,
 )-> Result<(StatusCode, Json<ApiResponse<Option<ResponseFindSku>>>),(StatusCode,String)> {
+    info!("User-Agent: {:?}", headers);
     if let Ok(sku_option) = SkuDao::find_sku(&pool, &request.sku_code).await{
         let sku_response = ResponseFindSku::from_db_sku(sku_option);
-        Ok((StatusCode::OK,Json(ApiResponse::SUCCESS { data: (sku_response) })))        
+        Ok((StatusCode::OK,Json(ApiResponse::success(sku_response))))
     }else{
         Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
     }

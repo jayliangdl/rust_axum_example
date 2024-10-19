@@ -60,6 +60,6 @@ pub async fn create_user(
     info!("Created user with ID: {}", id);
     // this will be converted into a JSON response
     // with a status code of 201 Created
-    Ok((StatusCode::OK, Json(ApiResponse::SUCCESS { data: user })))
+    Ok((StatusCode::OK, Json(ApiResponse::success ( user ))))
 }
 
