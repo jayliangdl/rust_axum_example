@@ -10,6 +10,7 @@ use crate::handlers::{
     frontend_sku::find_sku as front_find_sku,
     client_sku::find_sku as client_find_sku,
     operation_qa::create_question,
+    operation_qa::update_question,
 };
 
 pub fn app_router() -> Router {
@@ -24,4 +25,5 @@ pub fn app_router() -> Router {
         .route("/frontend/find_sku", post(front_find_sku))
         .route("/client/find_sku", post(client_find_sku))
         .route("/operation/create_question", post(create_question))
+        .route("/operation/update_question", post(update_question))
 }

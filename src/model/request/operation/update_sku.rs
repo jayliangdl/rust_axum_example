@@ -29,7 +29,7 @@ pub struct UpdateSku{
 impl UpdateSku{
     pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), ApiResponse<ResponseUpdateSku>>{
         if let Err(errors) = self.validate(){
-            let e: ApiResponse<ResponseUpdateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseUpdateSku>(errors);
+            let e: ApiResponse<ResponseUpdateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseUpdateSku>(errors,None);
             return Err(e);
         }
         if let Err(error_response) = self.validate_not_found_sku(pool).await
@@ -42,16 +42,16 @@ impl UpdateSku{
     }
 
     //校验sku是否存在    
-    async fn validate_not_found_sku(&self, pool:&MySqlPool)->Result<(),ErrorResponse>{
+    async fn validate_not_found_sku(&self, pool:&MySqlPool)->Result<(),ErrorResponse<ResponseUpdateSku>>{
         if let Ok(result) = SkuDao::find_sku(pool, &self.sku_code).await{
             if result.is_none(){
                 let mut parameters= HashMap::new();
                 parameters.insert("sku_code".to_string(), &self.sku_code);
-                let e = ErrorCode::SkuNotFound.to_error_response_from_parameters(parameters);
+                let e = ErrorCode::SkuNotFound.to_error_response_from_parameters(parameters,None);
                 return Err(e);     
             }
         }else{
-            let e = ErrorCode::InternalServerError.to_error_response_without_parameters();
+            let e = ErrorCode::InternalServerError.to_error_response_without_parameters(None);
             return Err(e);  
         }
         Ok(())

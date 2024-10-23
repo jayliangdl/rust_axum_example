@@ -31,8 +31,11 @@ pub async fn find_sku(
     };
     let api_response: ApiResponse<ResponseClientFindSku> = serde_json::from_str(&response_body)
         .map_err(|op_err| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to deserialize response body: {}", op_err)))?;
+    // let data = api_response.data;
+    // Ok((StatusCode::OK,Json(ApiResponse::success(data))))
+    
     match api_response{
         ApiResponse::SUCCESS{data,..} => Ok((StatusCode::OK,Json(ApiResponse::success(Some(data))))),
-        ApiResponse::ERROR{error_code,error_message,error_parameters} => Ok((StatusCode::OK,Json(ApiResponse::ERROR { error_code,error_message,error_parameters }))),
+        ApiResponse::ERROR{code,msg,error_parameters,..} => Ok((StatusCode::OK,Json(ApiResponse::error (code,msg,error_parameters,None)))),
     }   
 }

@@ -24,17 +24,17 @@ pub async fn find_sku(
     if let Some((_,CacheType::Sku(sku_option))) = CACHE.get(&key){
         let sku_option = ResponseFrontendFindSku::from_db_sku(sku_option);
         tracing::trace!("Cache hit");
-        return Ok((StatusCode::OK,Json(ApiResponse::success(sku_option ))));
+        return Ok((StatusCode::OK,Json(ApiResponse::success(Some(sku_option)))));
     }else{
         tracing::trace!("Cache miss");
         if let Ok(sku_option) = SkuDao::find_sku(&pool, sku_code).await{
             let sku_response: Option<ResponseFrontendFindSku> = ResponseFrontendFindSku::from_db_sku(sku_option.clone());
             let cache_type_with_sku: CacheType = CacheType::Sku(sku_option);
             CACHE.insert(key.clone(), (Expiration::AfterShortTime,cache_type_with_sku));
-            return Ok((StatusCode::OK,Json(ApiResponse::success ( sku_response ))));
+            return Ok((StatusCode::OK,Json(ApiResponse::success ( Some(sku_response) ))));
         }else{
             CACHE.insert(key.clone(), (Expiration::AfterShortTime,CacheType::Sku(None)));            
-            return Ok((StatusCode::OK,Json(ApiResponse::success (None ))));
+            return Ok((StatusCode::OK,Json(ApiResponse::success (None))));
         }
     }
 }

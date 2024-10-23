@@ -40,8 +40,8 @@ impl CreateQuestion{
             self.sku_code.clone(), 
             self.product_code.clone(), 
             self.question_content.clone(), 
-            self.create_user_id.clone(), 
-            self.creator_name.clone(), 
+            Some(self.create_user_id.clone()), 
+            Some(self.creator_name.clone()), 
             self.rank
         );
         for answer in &self.answer_list{
@@ -53,12 +53,12 @@ impl CreateQuestion{
 
     pub async fn custom_validate(&self)->Result<(), ApiResponse<ResponseCreateQuestion>>{
         if let Err(errors) = self.validate(){
-            let e: ApiResponse<ResponseCreateQuestion> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateQuestion>(errors);
+            let e: ApiResponse<ResponseCreateQuestion> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateQuestion>(errors,None);
             return Err(e);
         }
         for answer in &self.answer_list{
             if let Err(errors) = answer.validate(){
-                let e: ApiResponse<ResponseCreateQuestion> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateQuestion>(errors);
+                let e: ApiResponse<ResponseCreateQuestion> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateQuestion>(errors,None);
                 return Err(e);
             }
         }        
@@ -72,8 +72,8 @@ impl CreateAnswer{
         let db_answer: DbAnswer = DbAnswer::new(
             question_code, 
             self.answer_content.clone(), 
-            self.create_user_id.clone(), 
-            self.creator_name.clone(),
+            Some(self.create_user_id.clone()), 
+            Some(self.creator_name.clone()),
         );
         db_answer
     }
@@ -99,19 +99,19 @@ fn validate_answer_list(value: &Vec<CreateAnswer>) -> Result<(), ValidationError
 }
 
 #[cfg(test)]
-mod test{
+mod test {
     use crate::model::request::operation::create_question::CreateQuestion;
     use crate::model::request::operation::create_question::CreateAnswer;
     use crate::models::ApiResponse;
+
     #[tokio::test]
-    async fn test_validate_answer_list() {
-        //模拟Question中product_code为空的情况
+    async fn test_validate_product_code_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "".to_string();
         let question_content = "question_content".to_string();
         let create_user_id = "create_user_id".to_string();
         let creator_name = "creator_name".to_string();
-        let rank = 1;            
+        let rank = 1;
         let answer_list = vec![
             CreateAnswer {
                 answer_content: "answer_content".to_string(),
@@ -119,7 +119,7 @@ mod test{
                 creator_name: "creator_name".to_string(),
             },
         ];
-        let question1 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -128,26 +128,29 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question1.custom_validate().await;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-        //校验错误信息是否为"product_code不能为空"
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("productCode")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "product_code不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("productCode")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "product_code不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };
+        }
+    }
 
-        //模拟Question中question_content为空的情况
+    #[tokio::test]
+    async fn test_validate_question_content_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "product_code".to_string();
         let question_content = "".to_string();
@@ -161,7 +164,7 @@ mod test{
                 creator_name: "creator_name".to_string(),
             },
         ];
-        let question2 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -170,25 +173,29 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question2.custom_validate().await;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("questionContent")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "question_content不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("questionContent")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "question_content不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };
-        
-        //模拟Question中create_user_id为空的情况
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_create_user_id_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "product_code".to_string();
         let question_content = "question_content".to_string();
@@ -202,7 +209,7 @@ mod test{
                 creator_name: "creator_name".to_string(),
             },
         ];
-        let question3 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -211,25 +218,29 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question3.custom_validate().await;;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("createUserId")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "create_user_id不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("createUserId")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "create_user_id不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };
+        }
+    }
 
-        //模拟Question中answer_list为空的情况
+    #[tokio::test]
+    async fn test_validate_answer_list_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "product_code".to_string();
         let question_content = "question_content".to_string();
@@ -237,7 +248,7 @@ mod test{
         let creator_name = "creator_name".to_string();
         let rank = 1;
         let answer_list = vec![];
-        let question5 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -246,25 +257,29 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question5.custom_validate().await;;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("answers")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "answer_list列表不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("answers")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "answer_list列表不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };
+        }
+    }
 
-        //模拟Question.answer_list中answer_content为空的情况
+    #[tokio::test]
+    async fn test_validate_answer_content_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "product_code".to_string();
         let question_content = "question_content".to_string();
@@ -278,7 +293,7 @@ mod test{
                 creator_name: "creator_name".to_string(),
             },
         ];
-        let question6 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -287,26 +302,29 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question6.custom_validate().await;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("answerContent")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "answer_content不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("answerContent")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "answer_content不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };
+        }
+    }
 
-        // //模拟Question.answer_list中create_user_id为空的情况
+    #[tokio::test]
+    async fn test_validate_answer_create_user_id_empty() {
         let sku_code = Some("sku_code".to_string());
         let product_code = "product_code".to_string();
         let question_content = "question_content".to_string();
@@ -320,7 +338,7 @@ mod test{
                 creator_name: "creator_name".to_string(),
             },
         ];
-        let question7 = CreateQuestion{
+        let question = CreateQuestion {
             sku_code,
             product_code,
             question_content,
@@ -329,23 +347,24 @@ mod test{
             rank,
             answer_list,
         };
-        let result = question7.custom_validate().await;;
+        let result = question.custom_validate().await;
         assert_eq!(result.is_err(), true);
-        if let Err(error) = result{
-            match error{
-                ApiResponse::ERROR{error_message,error_parameters,..} => {
-                    assert_eq!(error_message, "入参错误");
-                    assert_eq!(error_parameters.unwrap().get("createUserId")
-                    .unwrap().as_array()
-                    .unwrap().get(0)
-                    .unwrap().get("message").unwrap().as_str().unwrap(),
-                    "create_user_id不能为空");
+        if let Err(error) = result {
+            match error {
+                ApiResponse::ERROR { msg, error_parameters, .. } => {
+                    assert_eq!(msg, "入参错误");
+                    assert_eq!(
+                        error_parameters.unwrap().get("createUserId")
+                            .unwrap().as_array()
+                            .unwrap().get(0)
+                            .unwrap().get("message").unwrap().as_str().unwrap(),
+                        "create_user_id不能为空"
+                    );
                 }
                 _ => {
                     panic!("错误类型不匹配")
                 }
             }
-        };            
-        
+        }
     }
 }

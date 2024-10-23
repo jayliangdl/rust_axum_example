@@ -98,28 +98,27 @@ impl CreateSku{
 
     pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), ApiResponse<ResponseCreateSku>>{
         if let Err(errors) = self.validate(){
-            let e: ApiResponse<ResponseCreateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateSku>(errors);
+            let e: ApiResponse<ResponseCreateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateSku>(errors,None);
             return Err(e);
         }
         if let Err(error_response) = self.validate_alreay_exists_sku(pool).await
         { 
-
             let api_response = error_response.to_api_response();
             return Err(api_response);
         }
         Ok(())
     }
     
-    async fn validate_alreay_exists_sku(&self,pool:&MySqlPool) -> Result<(),ErrorResponse> {
+    async fn validate_alreay_exists_sku(&self,pool:&MySqlPool) -> Result<(),ErrorResponse<ResponseCreateSku>> {
         if let Ok(result) = SkuDao::find_sku(pool, &self.sku_code).await{
             if result.is_some(){
                 let mut parameters= HashMap::new();
                 parameters.insert("sku_code".to_string(), &self.sku_code);
-                let e = ErrorCode::SkuAlreadyExists.to_error_response_from_parameters(parameters);
+                let e = ErrorCode::SkuAlreadyExists.to_error_response_from_parameters(parameters,None);
                 return Err(e);
             }
         }else{
-            let e = ErrorCode::InternalServerError.to_error_response_without_parameters();
+            let e = ErrorCode::InternalServerError.to_error_response_without_parameters(None);
             return Err(e);            
        }
         Ok(())

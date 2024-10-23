@@ -79,7 +79,7 @@ pub async fn create_sku(
     let response = ResponseCreateSku{
         sku_code: request.sku_code,
     };
-    Ok((StatusCode::OK, Json(ApiResponse::success ( response ))))
+    Ok((StatusCode::OK, Json(ApiResponse::success ( Some(response) ))))
 }
 
 #[instrument(name = "update_sku", fields(request_id = %Uuid::new_v4()))]
@@ -122,7 +122,7 @@ pub async fn update_sku(
     {
         sku_code: request.sku_code,
     };
-    let response: ApiResponse<ResponseUpdateSku> = ApiResponse::success ( data );
+    let response: ApiResponse<ResponseUpdateSku> = ApiResponse::success ( Some(data) );
     Ok((StatusCode::OK, Json(response)))
 }
 
@@ -135,7 +135,7 @@ pub async fn find_sku(
     info!("User-Agent: {:?}", headers);
     if let Ok(sku_option) = SkuDao::find_sku(&pool, &request.sku_code).await{
         let sku_response = ResponseFindSku::from_db_sku(sku_option);
-        Ok((StatusCode::OK,Json(ApiResponse::success(sku_response))))
+        Ok((StatusCode::OK,Json(ApiResponse::success(Some(sku_response)))))
     }else{
         Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
     }

@@ -33,11 +33,12 @@ pub async fn create_user(
     // info!("request.price:{}",request.price.fractional_digit_count());
 
     if let Err(errors) = request.validate(){
-        let error_response = ApiResponse::ERROR {
-            error_code: "0201020".to_string(), 
-            error_message: "参数错误".to_string(), 
-            error_parameters: Some(json!(errors)) 
-        };
+        let error_response = ApiResponse::error(
+            "0201020".to_string(), 
+            "参数错误".to_string(),             
+            Some(json!(errors)),
+            None
+        );
         return Ok((StatusCode::OK,Json(error_response)))
     }
 
@@ -60,6 +61,6 @@ pub async fn create_user(
     info!("Created user with ID: {}", id);
     // this will be converted into a JSON response
     // with a status code of 201 Created
-    Ok((StatusCode::OK, Json(ApiResponse::success ( user ))))
+    Ok((StatusCode::OK, Json(ApiResponse::success (Some(user)))))
 }
 

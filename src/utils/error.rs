@@ -9,6 +9,7 @@ pub enum ErrorCode{
     SkuAlreadyExists,
     InvalidParameter,
     SkuNotFound,
+    QuestionNotFound,
 }
 
 impl ErrorCode{
@@ -18,6 +19,7 @@ impl ErrorCode{
             Self::InvalidParameter => "0201020",
             Self::SkuAlreadyExists => "0201021",
             Self::SkuNotFound => "0201022",
+            Self::QuestionNotFound => "1301002",
         }
     }
     pub fn message(&self)->&'static str{
@@ -26,54 +28,57 @@ impl ErrorCode{
             Self::InvalidParameter => "入参错误",
             Self::SkuAlreadyExists => "商品已存在",
             Self::SkuNotFound => "商品找不到",
+            Self::QuestionNotFound => "数据库查询异常",
         }
     }
-    pub fn to_response_from_validation_errors<T>(&self,parameters: ValidationErrors)->ApiResponse<T>{
-        // let error_response: ErrorResponse = ErrorResponse{
-        //     error_code:self.code().to_string(),
-        //     error_message:self.message().to_string(),
-        //     error_parameters:Some(json!(parameters)),
-        // };
-        let error_response = ApiResponse::ERROR {
-            error_code: self.code().to_string(),
-            error_message: self.message().to_string(),
-            error_parameters: Some(json!(parameters))
-        };
+    pub fn to_response_from_validation_errors<T>(&self,parameters: ValidationErrors,data:Option<T>)->ApiResponse<T>{
+        let error_response = ApiResponse::error( 
+            self.code().to_string(),
+            self.message().to_string(),         
+            Some(json!(parameters)),
+            data,
+        );
         return error_response;
     }
 
-    pub fn to_response_from_hashmap<T>(&self,parameters: HashMap<String,&String>)->ApiResponse<T>{
-        let error_response = ApiResponse::ERROR {
-            error_code: self.code().to_string(),
-            error_message: self.message().to_string(),
-            error_parameters: Some(json!(parameters))
-        };
+    pub fn to_response_from_hashmap<T>(&self,parameters: HashMap<String,&String>,data:Option<T>)->ApiResponse<T>{
+        let error_response = ApiResponse::error(
+            self.code().to_string(),
+            self.message().to_string(),            
+            Some(json!(parameters)),
+            data,
+        );
         return error_response;
     }
 
-    pub fn to_response_from_empty_parameters<T>(&self)->ApiResponse<T>{
-        let error_response = ApiResponse::ERROR {
-            error_code: self.code().to_string(),
-            error_message: self.message().to_string(),
-            error_parameters: None
-        };
+    pub fn to_response_from_empty_parameters<T>(&self,data:Option<T>)->ApiResponse<T>{
+        let error_response = ApiResponse::error( 
+            self.code().to_string(),
+            self.message().to_string(),         
+            None,
+            data,
+        );
         return error_response;
     }
 
-    pub fn to_error_response_from_parameters(&self,parameters: HashMap<String,&String>)->ErrorResponse{
+    pub fn to_error_response_from_parameters<T: Clone>(&self,parameters: HashMap<String,&String>,data:Option<T>)->ErrorResponse<T>{
         let error_response = ErrorResponse{
-            error_code:self.code().to_string(),
-            error_message:self.message().to_string(),
+            code:self.code().to_string(),
+            msg:self.message().to_string(),
+            success: false,
             error_parameters:Some(json!(parameters)),
+            data
         };
         error_response
     }
 
-    pub fn to_error_response_without_parameters(&self)->ErrorResponse{
-        let error_response = ErrorResponse{
-            error_code:self.code().to_string(),
-            error_message:self.message().to_string(),
-            error_parameters:None
+    pub fn to_error_response_without_parameters<T:Clone>(&self,data:Option<T>)->ErrorResponse<T>{
+        let error_response: ErrorResponse<T> = ErrorResponse{
+            code:self.code().to_string(),
+            msg:self.message().to_string(),
+            success: false,
+            error_parameters:None,
+            data
         };
         error_response
     }

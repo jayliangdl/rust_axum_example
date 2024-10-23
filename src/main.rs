@@ -25,13 +25,10 @@ async fn main() {
     // 加载环境变量
     dotenv().ok();  
     // 获取日志级别并初始化日志
-    let log_level = env::var("LOG_LEVEL").unwrap_or_else(|_|"info".to_string());
-    info!("log_level:{}", log_level);
-    init_log(log_level).await; // 日志初始化
-    
+    init_log().await; // 日志初始化
     // 获取数据库连接地址并初始化连接池
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");
-    let pool = init_pool(&database_url).await.expect("Cannot init the database pool");
+    // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");
+    let pool = init_pool().await.expect("Cannot init the database pool");
 
     // Nacos 配置
     let nacos_url = env::var("NACOS_URL").unwrap_or_else(|_| "http://localhost:8848".to_string());
