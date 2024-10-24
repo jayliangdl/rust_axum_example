@@ -4,6 +4,13 @@ use validator::Validate;
 
 #[derive(Serialize,Deserialize, Debug, Validate, Clone)]
 pub struct FindQuestionListForTrad {
+
+    #[serde(rename = "pageNum")]
+    #[validate(range(min = 1, message = "页面参数不合法，应该是大于等于1的整数"))]
+    pub current_pageno:i64,
+    #[serde(rename = "pageSize")]
+    pub page_size:i64,
+
     #[serde(rename="idStr")]
     pub id_str: Option<String>,
     #[serde(rename = "productCode")]
@@ -27,6 +34,8 @@ pub struct FindQuestionListForTrad {
 impl FindQuestionListForTrad {
     pub fn new() -> Self {
         FindQuestionListForTrad {
+            current_pageno: 1,
+            page_size: 10,
             id_str: None,
             product_code: None,
             question_content: None,

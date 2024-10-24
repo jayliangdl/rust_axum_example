@@ -1,4 +1,5 @@
 
+
 pub mod request_models{
     use validator::Validate;
     use serde::{Deserialize, Serialize};
@@ -40,6 +41,32 @@ pub mod response_models{
     #[derive(Serialize,Debug)]
     pub struct EnvVariable{
         pub value: String,
+    }
+
+    #[derive(Serialize,Debug)]
+    pub struct PageResponse<T>{
+        #[serde(rename = "totalCount")]
+        pub total_records:i64,
+        #[serde(rename = "curPageNum")]
+        pub current_pageno:i64,
+        #[serde(rename = "pageSize")]
+        pub page_size:i64,
+        #[serde(rename = "totalPage")]
+        pub total_pages:i64,
+        #[serde(rename = "list")]
+        pub data:Option<Vec<T>>,
+    }
+
+    impl <T> PageResponse<T>{
+        pub fn new(total_records:i64,current_pageno:i64,page_size:i64,total_pages:i64,data:Option<Vec<T>>)->Self{
+            PageResponse{
+                total_records,
+                current_pageno,
+                page_size,
+                total_pages,
+                data,
+            }
+        }
     }
 }
 
@@ -87,6 +114,10 @@ impl<T> ApiResponse<T>{
         }
     }
 }
+
+
+
+
 
 // use serde::{Deserialize, Serialize};
 // #[derive(Serialize,Debug,Deserialize)]
@@ -186,5 +217,3 @@ pub mod nacos_models{
         pub namespace_id: String,
     }
 }
-
-

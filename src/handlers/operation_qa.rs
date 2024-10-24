@@ -1,11 +1,14 @@
+use axum::http::response;
 use tracing::info;
 use tracing::instrument;
 use axum::Extension;
 use axum_extra::TypedHeader;
 use headers::UserAgent;
 use sqlx::mysql::MySqlPool;
+use validator::Validate;
 use std::collections::HashMap;
 use axum::{
+    extract::Query,
     http::StatusCode, Json
 };
 use uuid::Uuid;
@@ -14,10 +17,14 @@ use crate::model::request::operation::{
     create_question::CreateQuestion as RequestCreateQuestion,
     update_question::UpdateQuestion as RequestUpdateQuestion,
     find_question_list_for_trad::FindQuestionListForTrad as RequestFindQuestionListForTrad,
+    top_question::TopQuestion as RequestTopQuestion,
 };
+use crate::model::response::operation::find_question_list_for_trad::Question;
 use crate::model::response::operation::{
     create_question::CreateQuestion as ResponseCreateQuestion,
     update_question::UpdateQuestion as ResponseUpdateQuestion,
+    find_question_list_for_trad::FindQuestionListForTrad as ResponseFindQuestionListForTrad,
+    top_question::TopQuestion as ResponseTopQuestion,
 };
 use crate::utils::datetime::now_local;
 use crate::utils::error::ErrorCode;
@@ -121,17 +128,82 @@ pub async fn update_question(
     Ok((StatusCode::OK, Json(api_response)))
 }
 
+#[instrument(name = "findQuestionListForTrad", fields(request_id = %Uuid::new_v4()))]
+pub async fn find_question_list_for_trad(
+    Extension(pool): Extension<MySqlPool>,
+    Json(request): Json<RequestFindQuestionListForTrad>,
+)-> Result<(StatusCode, Json<ApiResponse<ResponseFindQuestionListForTrad>>),(StatusCode,String)> {
+    request.validate().map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let current_pageno = request.current_pageno;
+    let page_size = request.page_size;
+    
+    if let Ok(page_questions) = QuestionDao::query_question_list(&pool, &request, current_pageno, page_size).await{        
+        let mut response_questions = vec![];
+        for question in &page_questions.data {
+            let question_code = &question.question_code;
+            match QuestionDao::query_answer_by_question_code(&pool, question_code).await {
+                Ok(answers) => {
+                    let question_response = Question::from_db_questions(question.clone(),answers);
+                    response_questions.push(question_response);
+                },
+                Err(_) => {
+                    let question_response = Question::from_db_questions(question.clone(),vec![]);
+                    response_questions.push(question_response);
+                }
+            }
+        }
+        let response_find_question_list_for_trad = ResponseFindQuestionListForTrad::new(
+            page_questions.total_records,
+            page_questions.current_pageno,
+            page_questions.page_size,
+            page_questions.total_pages,
+            response_questions,
+        );
+        let api_response = ApiResponse::success(
+            Some(response_find_question_list_for_trad)
+       );
+       Ok((StatusCode::OK, Json(api_response)))
+    }else{
+        Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
+    }
+}
+
+#[instrument(name = "top_question", skip(params),fields(request_id = %Uuid::new_v4()))]
+pub async fn top_question(
+    Extension(pool): Extension<MySqlPool>,
+    Query(params): Query<crate::model::request::operation::top_question::TopQuestion>,
+    ) 
+    -> Result<(StatusCode, Json<ApiResponse<bool>>), (StatusCode, String)> {
+    let question_code = &params.question_code;
+    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &question_code).await{
+        if question_option.is_none(){
+            let mut parameters= HashMap::new();
+            parameters.insert("question_code".to_string(), question_code);
+            let api_response = ErrorCode::QuestionNotFound.to_response_from_hashmap::<bool>(parameters,None);
+            return Ok((StatusCode::OK,Json(api_response)))            
+        }else{
+            // 开始一个事务
+            let mut transaction = pool.begin().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+            let next_sort = QuestionDao::have_next_sort(&pool).await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+            // let sort:i32 = 1;
+            QuestionDao::update_sort_by_question_code(&mut transaction, question_code, next_sort).await
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "置顶Question失败".to_string()))?;
+
+            // 提交事务
+            transaction.commit().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
+        }
+    }else {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR,"查询Question失败".to_string()));
+    }
+    let api_response = ApiResponse::success(
+        Some(true)
+   );
+    Ok((StatusCode::OK, Json(api_response)))
+
+}
 
 
-// #[instrument(name = "findQuestionListForTrad", fields(request_id = %Uuid::new_v4()))]
-// pub async fn find_question_list_for_trad(
-//     Extension(pool): Extension<MySqlPool>,
-//     Json(request): Json<RequestFindQuestionListForTrad>,
-// )-> Result<(StatusCode, Json<ApiResponse<Option<RequestFindQuestionListForTrad>>>),(StatusCode,String)> {
-//     if let Ok(sku_option) = SkuDao::find_sku(&pool, &request.sku_code).await{
-//         let sku_response = ResponseFindSku::from_db_sku(sku_option);
-//         Ok((StatusCode::OK,Json(ApiResponse::SUCCESS { data: (sku_response) })))        
-//     }else{
-//         Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
-//     }
-// }
+

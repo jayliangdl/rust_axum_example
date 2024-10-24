@@ -1989,6 +1989,7 @@ dependencies = [
  "once_cell",
  "rand",
  "rust_decimal",
+ "scopeguard",
  "serde",
  "serde_json",
  "serde_urlencoded",

@@ -117,9 +117,9 @@ impl Into<String> for AnswerStatus{
     }
 }
 
-#[derive(FromRow,Clone,Debug)]
+#[derive(FromRow,Clone,Debug, PartialEq)]
 pub struct Answer{
-    pub id:Option<i32>,
+    pub id:Option<i64>,
     pub question_code:String,
     pub answer_content:String,
     pub create_user_id:Option<String>,
@@ -143,5 +143,41 @@ impl Answer{
             creator_name,
         };
         return answer;
+    }
+}
+
+#[derive(Clone,Debug, PartialEq)]
+pub struct Page<T>{
+    pub total_records:i64,
+    pub total_pages:i64,
+    pub current_pageno:i64,
+    pub next_pageno:Option<i64>,
+    pub previous_pageno:Option<i64>,
+    pub page_size:i64,
+    pub data:Vec<T>,
+}
+
+impl<T> Page<T>{
+    pub fn new(total_records:i64,current_pageno:i64,page_size:i64,data:Vec<T>)->Self{
+        let next_pageno = if total_records > current_pageno*page_size{
+            Some(current_pageno+1)
+        }else{
+            None
+        };
+        let previous_pageno = if current_pageno>1{
+            Some(current_pageno-1)
+        }else{
+            None
+        };
+        let total_pages = total_records/page_size;
+        Page{
+            total_records,
+            total_pages,
+            current_pageno,
+            next_pageno,
+            previous_pageno,
+            page_size,
+            data,
+        }
     }
 }

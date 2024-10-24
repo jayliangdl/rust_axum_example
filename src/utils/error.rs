@@ -28,7 +28,7 @@ impl ErrorCode{
             Self::InvalidParameter => "入参错误",
             Self::SkuAlreadyExists => "商品已存在",
             Self::SkuNotFound => "商品找不到",
-            Self::QuestionNotFound => "数据库查询异常",
+            Self::QuestionNotFound => "找不到对应的问题记录",
         }
     }
     pub fn to_response_from_validation_errors<T>(&self,parameters: ValidationErrors,data:Option<T>)->ApiResponse<T>{
