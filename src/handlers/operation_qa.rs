@@ -1,4 +1,3 @@
-use axum::http::response;
 use tracing::info;
 use tracing::instrument;
 use axum::Extension;
@@ -17,14 +16,12 @@ use crate::model::request::operation::{
     create_question::CreateQuestion as RequestCreateQuestion,
     update_question::UpdateQuestion as RequestUpdateQuestion,
     find_question_list_for_trad::FindQuestionListForTrad as RequestFindQuestionListForTrad,
-    top_question::TopQuestion as RequestTopQuestion,
 };
 use crate::model::response::operation::find_question_list_for_trad::Question;
 use crate::model::response::operation::{
     create_question::CreateQuestion as ResponseCreateQuestion,
     update_question::UpdateQuestion as ResponseUpdateQuestion,
     find_question_list_for_trad::FindQuestionListForTrad as ResponseFindQuestionListForTrad,
-    top_question::TopQuestion as ResponseTopQuestion,
 };
 use crate::utils::datetime::now_local;
 use crate::utils::error::ErrorCode;
