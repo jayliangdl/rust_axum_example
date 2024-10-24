@@ -187,6 +187,50 @@ impl QuestionDao{
         Ok(())
     }
 
+    /// 依据question_code软删除问题记录（设置失效）
+    pub async fn disabled_question_by_question_code(
+        transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+        question_code: &String,
+    )->Result<(), (StatusCode, String)>{
+
+        // 执行插入操作，并忽略返回的结果
+        let query = sqlx::query!("update rc_qa_question set `status`='0' 
+        where `question_code` = ? and `status`='1'",question_code);
+        
+        query.execute(&mut **transaction)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除问题失败".to_string()))?;
+
+        Ok(())
+    }
+
+    /// 依据question_code软删除回答记录（设置失效）
+    pub async fn disable_answer_by_question_code(
+        transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+        question_code: &String,
+    )->Result<(), (StatusCode, String)>{
+    
+        // 执行插入操作，并忽略返回的结果
+        let query = sqlx::query!("update rc_qa_answer set `status`='0' where `question_code` = ? and `status`='1'",question_code);
+        
+        query.execute(&mut **transaction)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除回答失败".to_string()))?;
+
+        Ok(())
+    }
+
+    pub async fn disabled_question_and_answer_by_question_code(
+        transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+        question_code: &String,
+    )->Result<(), (StatusCode, String)>{
+        let _ = QuestionDao::disable_answer_by_question_code(transaction, question_code).await
+        .map_err(|_| "设置Answer失效失败".to_string());
+        let _ = QuestionDao::disabled_question_by_question_code(transaction, question_code).await
+        .map_err(|_| "设置Question失效失败".to_string());
+        Ok(())
+    }
+
     //构造查询条件
     pub fn query_question_list_condition<'a>(
         builder:&mut QueryBuilder<'a, sqlx::MySql>,

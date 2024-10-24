@@ -13,6 +13,8 @@ use crate::handlers::{
     operation_qa::update_question,
     operation_qa::find_question_list_for_trad,
     operation_qa::top_question,
+    operation_qa::cancel_top_question,
+    operation_qa::disabled_question,
 };
 
 pub fn app_router() -> Router {
@@ -30,4 +32,7 @@ pub fn app_router() -> Router {
         .route("/operation/updateQuestion", post(update_question))
         .route("/operation/findQuestionListForTrad", post(find_question_list_for_trad))
         .route("/operation/topQuestion", get(top_question))
+        .route("/operation/cancelTopQuestion", get(cancel_top_question))
+        .route("/operation/deleteQuestion", post(disabled_question))
+
     }

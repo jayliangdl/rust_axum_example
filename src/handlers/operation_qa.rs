@@ -16,6 +16,9 @@ use crate::model::request::operation::{
     create_question::CreateQuestion as RequestCreateQuestion,
     update_question::UpdateQuestion as RequestUpdateQuestion,
     find_question_list_for_trad::FindQuestionListForTrad as RequestFindQuestionListForTrad,
+    delete_question::DeleteQuestion as RequestDeleteQuestion,
+    top_question::TopQuestion as RequestTopQuestion,
+    cancel_top_question::CancelTopQuestion as RequestCancelTopQuestion
 };
 use crate::model::response::operation::find_question_list_for_trad::Question;
 use crate::model::response::operation::{
@@ -168,7 +171,7 @@ pub async fn find_question_list_for_trad(
 #[instrument(name = "top_question", skip(params),fields(request_id = %Uuid::new_v4()))]
 pub async fn top_question(
     Extension(pool): Extension<MySqlPool>,
-    Query(params): Query<crate::model::request::operation::top_question::TopQuestion>,
+    Query(params): Query<RequestTopQuestion>,
     ) 
     -> Result<(StatusCode, Json<ApiResponse<bool>>), (StatusCode, String)> {
     let question_code = &params.question_code;
@@ -200,6 +203,78 @@ pub async fn top_question(
    );
     Ok((StatusCode::OK, Json(api_response)))
 
+}
+
+#[instrument(name = "cancel_top_question", skip(params),fields(request_id = %Uuid::new_v4()))]
+pub async fn cancel_top_question(
+    Extension(pool): Extension<MySqlPool>,
+    Query(params): Query<RequestCancelTopQuestion>,
+    ) 
+    -> Result<(StatusCode, Json<ApiResponse<bool>>), (StatusCode, String)> {
+    let question_code = &params.question_code;
+    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &question_code).await{
+        if question_option.is_none(){
+            let mut parameters= HashMap::new();
+            parameters.insert("question_code".to_string(), question_code);
+            let api_response = ErrorCode::QuestionNotFound.to_response_from_hashmap::<bool>(parameters,None);
+            return Ok((StatusCode::OK,Json(api_response)))            
+        }else{
+            // 开始一个事务
+            let mut transaction = pool.begin().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+            let reset_sort = 0;
+            QuestionDao::update_sort_by_question_code(&mut transaction, question_code, reset_sort).await
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "取消问题记录置顶失败".to_string()))?;
+
+            // 提交事务
+            transaction.commit().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
+        }
+    }else {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR,"查询问题记录失败".to_string()));
+    }
+    let api_response = ApiResponse::success(
+        Some(true)
+   );
+    Ok((StatusCode::OK, Json(api_response)))
+
+}
+
+#[instrument(name = "disabled_question", fields(request_id = %Uuid::new_v4()))]
+pub async fn disabled_question(
+    Extension(pool): Extension<MySqlPool>,
+    TypedHeader(headers): TypedHeader<UserAgent>,
+    Json(request): Json<RequestDeleteQuestion>,
+)-> Result<(StatusCode, Json<ApiResponse<bool>>),(StatusCode,String)> {
+    if let Err(errors) = request.validate(){
+        let e: ApiResponse<bool> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<bool>(errors,None);
+        return Ok((StatusCode::OK,Json(e)))
+    }
+    //先依据question_code查询数据库，确保question_code存在
+    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &request.question_code).await{
+        if question_option.is_none(){
+            let mut parameters= HashMap::new();
+            parameters.insert("question_code".to_string(), &request.question_code);
+            let api_response = ErrorCode::QuestionNotFound.to_response_from_hashmap::<bool>(parameters,None);
+            return Ok((StatusCode::OK,Json(api_response)))            
+        }else{
+            // 开始一个事务
+            let mut transaction = pool.begin().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+            QuestionDao::disabled_question_and_answer_by_question_code(&mut transaction, &request.question_code).await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除问题记录失败".to_string()))?;
+            // 提交事务
+            transaction.commit().await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
+        }
+    }else {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR,"查询Question失败".to_string()));
+    }
+    
+    let api_response: ApiResponse<bool> = ApiResponse::success(
+         Some(true)
+    );
+    Ok((StatusCode::OK, Json(api_response)))
 }
 
 

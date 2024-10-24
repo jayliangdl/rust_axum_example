@@ -6,3 +6,5 @@ pub mod create_question;
 pub mod update_question;
 pub mod find_question_list_for_trad;
 pub mod top_question;
+pub mod delete_question;
+pub mod cancel_top_question;
