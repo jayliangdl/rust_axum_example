@@ -102,7 +102,7 @@ pub struct Answer {
     pub create_time: String,
     #[serde(rename = "updateTime")]
     pub update_time: String,
-    pub status: String,
+    pub status: i8,
 }
 
 impl Answer{
@@ -115,7 +115,7 @@ impl Answer{
             creator_name: answer.creator_name.clone(),
             create_time: answer.create_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             update_time: answer.update_time.format("%Y-%m-%d %H:%M:%S").to_string(),
-            status: answer.status.clone(),
+            status: answer.status,
         }
     }
 }

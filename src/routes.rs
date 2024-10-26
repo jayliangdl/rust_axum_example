@@ -15,6 +15,7 @@ use crate::handlers::{
     operation_qa::top_question,
     operation_qa::cancel_top_question,
     operation_qa::disabled_question,
+    frontend_qa::get_question_by_code,
 };
 
 pub fn app_router() -> Router {
@@ -34,5 +35,6 @@ pub fn app_router() -> Router {
         .route("/operation/topQuestion", get(top_question))
         .route("/operation/cancelTopQuestion", get(cancel_top_question))
         .route("/operation/deleteQuestion", post(disabled_question))
+        .route("/frontend/getQuestionByCode", get(get_question_by_code))
 
     }

@@ -98,21 +98,21 @@ pub enum AnswerStatus{
     Inactive,
 }
 
-impl From<&str> for AnswerStatus{
-    fn from(status:&str)->Self{
+impl From<&i8> for AnswerStatus{
+    fn from(status:&i8)->Self{
         match status{
-            "1"=>AnswerStatus::Active,
-            "0"=>AnswerStatus::Inactive,
+            1=>AnswerStatus::Active,
+            0=>AnswerStatus::Inactive,
             _=>AnswerStatus::Inactive,
         }
     }
 } 
 
-impl Into<String> for AnswerStatus{
-    fn into(self) -> String {
+impl Into<i8> for AnswerStatus{
+    fn into(self) -> i8 {
         match self {
-            AnswerStatus::Active => "1".to_string(),
-            AnswerStatus::Inactive => "0".to_string(),
+            AnswerStatus::Active => 1,
+            AnswerStatus::Inactive => 0,
         }
     }
 }
@@ -125,7 +125,7 @@ pub struct Answer{
     pub create_user_id:Option<String>,
     pub create_time:chrono::NaiveDateTime,
     pub update_time:chrono::NaiveDateTime,
-    pub status:String,
+    pub status:i8,
     pub creator_name:Option<String>,
 }
 

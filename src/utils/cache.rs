@@ -17,6 +17,7 @@ pub enum CacheType {
     DateTime(String),
     Sku(Option<crate::model::db::sku::Sku>),
     LoadBalance(Arc<LoadBalance>),
+    Question(Option<crate::model::cache::qa::Question>),
 }
 
 // 定义一个全局的、懒加载的缓存实例

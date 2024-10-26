@@ -5,3 +5,4 @@ pub mod operation_sku;
 pub mod frontend_sku;
 pub mod client_sku;
 pub mod operation_qa;
+pub mod frontend_qa;
