@@ -10,6 +10,7 @@ use std::env;
 use std::sync::Arc;
 use crate::utils::cache::{CacheType,Expiration,CACHE};
 use crate::services_dependence::get_services_dependence_list;
+use crate::utils::load_balance;
 
 const REENABLE_DELAY_MS : u64 = 5000;//对于不可用的实例，超过这个时间，重置失败次数
 const MAX_FAILED_TIMES:usize = 15;//最大失败次数，超过这个次数，就不再尝试访问这个实例
@@ -186,17 +187,26 @@ pub async fn fetch_load_balance_from_nacos(){
     let services_dependence_list = get_services_dependence_list();    
     async fn refresh_cache(nacos_url:&str,services_dependence_list: &Vec<String>,group_name: &str,namespace_id: &str){
         for service_name in services_dependence_list{
-            let load_balance = get_service_instances(nacos_url,service_name,group_name,namespace_id).await
-            .expect("Failed to start Nacos manager");
-            let key=format!("load_balance_{}",&service_name);
-            let arc_lb = Arc::new(load_balance);
-            let lb_with_cache_type = CacheType::LoadBalance(arc_lb.clone());
-            CACHE.insert(key, (Expiration::AfterLongTime,lb_with_cache_type));
-            tokio::spawn(
+            let load_balance = get_service_instances(nacos_url,service_name,group_name,namespace_id).await;
+            // .expect("Failed to start Nacos manager");
+            match load_balance{
+                Ok(load_balance)=>{
+                    let key=format!("load_balance_{}",&service_name);
+                    let arc_lb = Arc::new(load_balance);
+                    let lb_with_cache_type = CacheType::LoadBalance(arc_lb.clone());
+                    CACHE.insert(key, (Expiration::AfterLongTime,lb_with_cache_type));
+                    tokio::spawn(
                 async move{
                     arc_lb.clone().reenable_instances().await;
                 }
             );
+                },
+                Err(e)=>{
+                    error!("Failed to get service instances: {}",e);
+                    continue;
+                }
+            }
+            
         }
     }
 

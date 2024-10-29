@@ -127,7 +127,7 @@ impl QuestionDao{
     }
 
     /// 依据question_code查询有效的问题记录
-    pub async fn query_question_by_question_code(
+    pub async fn find_question_by_question_code(
         pool: &MySqlPool,
         question_code: &String,
     )->Result<Option<Question>, (StatusCode, String)>{
@@ -280,7 +280,7 @@ impl QuestionDao{
         return Ok(page);
     }
 
-    //依据查询条件查询问题列表（分页）
+    /// 依据查询条件查询问题列表（分页）
     async fn query_question_list_by_page(
         pool: &MySqlPool,
         request_find_question_list_for_trad: &RequestFindQuestionListForTrad, 
@@ -301,7 +301,7 @@ impl QuestionDao{
         Ok(result)
     }
 
-    //依据查询条件查询问题列表
+    /// 依据查询条件查询问题列表
     async fn query_question_count(
         pool: &MySqlPool,
         request_find_question_list_for_trad: &RequestFindQuestionListForTrad,        
@@ -345,11 +345,13 @@ impl QuestionDao{
         
         query.execute(&mut **transaction)
         .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "置顶问题记录失败".to_string()))?;
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "更新问题记录中的Sort(排序号)失败".to_string()))?;
 
         Ok(())
     }
 
+    /// 查询下一个sort值
+    /// 逻辑：查询数据库中当前最大sort值+1
     pub async fn have_next_sort(
         pool: &MySqlPool,      
     )->Result<i32, (StatusCode, String)>{

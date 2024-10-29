@@ -37,7 +37,7 @@ pub async fn get_question_by_code(
         let db_review_list = QuestionDao::query_answer_by_question_code(&pool, question_code).await
             .map_err(|e|(StatusCode::INTERNAL_SERVER_ERROR,format!("数据库错误： {}",e.1)))?;
         
-        if let Ok(db_question_option) = QuestionDao::query_question_by_question_code(&pool, question_code).await{
+        if let Ok(db_question_option) = QuestionDao::find_question_by_question_code(&pool, question_code).await{
             let db_question = db_question_option.unwrap();
             let question_response = ResponseGetQuestionByCode::from_db(db_question.clone(),db_review_list.clone());
             let cache_question = CacheQuestion::from_db(db_question, db_review_list);

@@ -81,7 +81,7 @@ pub async fn update_question(
     }
 
     //先依据question_code查询数据库，确保question_code存在
-    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &request.question_code).await{
+    if let Ok(question_option) = QuestionDao::find_question_by_question_code(&pool, &request.question_code).await{
         if question_option.is_none(){
             let mut parameters= HashMap::new();
             parameters.insert("question_code".to_string(), &request.question_code);
@@ -175,7 +175,7 @@ pub async fn top_question(
     ) 
     -> Result<(StatusCode, Json<ApiResponse<bool>>), (StatusCode, String)> {
     let question_code = &params.question_code;
-    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &question_code).await{
+    if let Ok(question_option) = QuestionDao::find_question_by_question_code(&pool, &question_code).await{
         if question_option.is_none(){
             let mut parameters= HashMap::new();
             parameters.insert("question_code".to_string(), question_code);
@@ -212,7 +212,7 @@ pub async fn cancel_top_question(
     ) 
     -> Result<(StatusCode, Json<ApiResponse<bool>>), (StatusCode, String)> {
     let question_code = &params.question_code;
-    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &question_code).await{
+    if let Ok(question_option) = QuestionDao::find_question_by_question_code(&pool, &question_code).await{
         if question_option.is_none(){
             let mut parameters= HashMap::new();
             parameters.insert("question_code".to_string(), question_code);
@@ -251,7 +251,7 @@ pub async fn disabled_question(
         return Ok((StatusCode::OK,Json(e)))
     }
     //先依据question_code查询数据库，确保question_code存在
-    if let Ok(question_option) = QuestionDao::query_question_by_question_code(&pool, &request.question_code).await{
+    if let Ok(question_option) = QuestionDao::find_question_by_question_code(&pool, &request.question_code).await{
         if question_option.is_none(){
             let mut parameters= HashMap::new();
             parameters.insert("question_code".to_string(), &request.question_code);
