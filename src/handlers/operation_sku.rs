@@ -4,9 +4,7 @@ use axum::Extension;
 use sqlx::mysql::MySqlPool;
 use axum_extra::TypedHeader;
 use headers::UserAgent;
-use axum::{
-    http::StatusCode, Json
-};
+use axum::Json;
 use serde_json::json;
 use serde_json::Map;
 use uuid::Uuid;
@@ -25,17 +23,19 @@ use crate::model::response::operation::{
 };
 
 use crate::model::db::sku::Price;
-use crate::models::ApiResponse;
+use crate::models::response_models::AppResponse;
 use crate::dao::sku_dao::SkuDao;
+use crate::utils::error::BusinessError;
 
 #[instrument(name = "create_sku", fields(request_id = %Uuid::new_v4()))]
 pub async fn create_sku(
     Extension(pool): Extension<MySqlPool>,
     Json(request): Json<RequestCreateSku>,
-)-> Result<(StatusCode, Json<ApiResponse<ResponseCreateSku>>),(StatusCode,String)> {
-    if let Err(errors) = request.custom_validate(&pool).await{
-        return Ok((StatusCode::OK,Json(errors)))
-    }
+)-> Result<Json<AppResponse<ResponseCreateSku>>,BusinessError> {
+    request.custom_validate(&pool).await?;
+    // if let Err(errors) = request.custom_validate(&pool).await{
+    //     return Ok((StatusCode::OK,Json(errors)))
+    // }
 
     let sku = request.into_db_sku();
 
@@ -43,11 +43,11 @@ pub async fn create_sku(
     let current_time:DateTime<Utc> = Utc::now();
 
     // 开始一个事务
-    let mut transaction = pool.begin().await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+    let mut transaction = pool.begin().await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
 
-    SkuDao::insert_sku(&mut transaction, &sku, current_time).await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to insert SKU".to_string()))?;
+    SkuDao::insert_sku(&mut transaction, &sku, current_time).await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to insert SKU".to_string()))?;
 
     //request.price_list转换成类型为model::db::sku::Price的price_list
     let price_list = request.price_list.clone().into_iter().map(|price|{
@@ -57,8 +57,8 @@ pub async fn create_sku(
         db_price
     }).collect::<Vec<Price>>();
 
-    SkuDao::insert_sku_price_list(&mut transaction, &price_list, current_time).await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to insert SKU price list".to_string()))?;
+    SkuDao::insert_sku_price_list(&mut transaction, &price_list, current_time).await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to insert SKU price list".to_string()))?;
 
      // 创建 JSON 内容
      let content = json!({
@@ -70,8 +70,8 @@ pub async fn create_sku(
     SkuDao::insert_sku_log(&mut transaction,&request.sku_code,content,current_time).await?;
 
     // 提交事务
-    transaction.commit().await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
+    transaction.commit().await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
 
 
     info!("Created SKU : {:?}", request);
@@ -79,27 +79,28 @@ pub async fn create_sku(
     let response = ResponseCreateSku{
         sku_code: request.sku_code,
     };
-    Ok((StatusCode::OK, Json(ApiResponse::success ( Some(response) ))))
+    Ok(Json(AppResponse::success (response)))
 }
 
 #[instrument(name = "update_sku", fields(request_id = %Uuid::new_v4()))]
 pub async fn update_sku(
     Extension(pool): Extension<MySqlPool>,
     Json(request): Json<RequestUpdateSku>,
-)-> Result<(StatusCode, Json<ApiResponse<ResponseUpdateSku>>),(StatusCode,String)> {
-    if let Err(errors) = request.custom_validate(&pool).await{
-        return Ok((StatusCode::OK,Json(errors)))
-    }
+)-> Result<Json<AppResponse<ResponseUpdateSku>>,BusinessError> {
+    request.custom_validate(&pool).await?;
+    // if let Err(errors) = request.custom_validate(&pool).await{
+    //     return Ok((StatusCode::OK,Json(errors)))
+    // }
     // 获取当前时间戳
     let current_time:DateTime<Utc> = Utc::now();
 
     // 开始一个事务
-    let mut transaction: sqlx::Transaction<'_, sqlx::MySql> = pool.begin().await
-    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
+    let mut transaction: sqlx::Transaction<'_, sqlx::MySql> = pool.begin().await?;
+    // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to start transaction".to_string()))?;
 
     let sku = request.into_db_sku();
-    SkuDao::update_sku(&mut transaction, &sku, current_time).await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update SKU".to_string()))?;
+    SkuDao::update_sku(&mut transaction, &sku, current_time).await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update SKU".to_string()))?;
 
      // 创建 JSON 内容
      let mut content = Map::new();
@@ -112,8 +113,8 @@ pub async fn update_sku(
     SkuDao::insert_sku_log(&mut transaction,&request.sku_code,serde_json::Value::Object(content),current_time).await?;
 
     // 提交事务
-    transaction.commit().await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
+    transaction.commit().await?;
+        // .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to commit transaction".to_string()))?;
 
 
     info!("Updated SKU : {:?}", &request);
@@ -122,8 +123,7 @@ pub async fn update_sku(
     {
         sku_code: request.sku_code,
     };
-    let response: ApiResponse<ResponseUpdateSku> = ApiResponse::success ( Some(data) );
-    Ok((StatusCode::OK, Json(response)))
+    Ok(Json(AppResponse::success(data)))
 }
 
 #[instrument(name = "find_sku", fields(request_id = %Uuid::new_v4()))]
@@ -131,12 +131,15 @@ pub async fn find_sku(
     TypedHeader(headers): TypedHeader<UserAgent>,
     Extension(pool): Extension<MySqlPool>,
     Json(request): Json<RequestFindSku>,
-)-> Result<(StatusCode, Json<ApiResponse<Option<ResponseFindSku>>>),(StatusCode,String)> {
+)-> Result<Json<AppResponse<Option<ResponseFindSku>>>,BusinessError> {
     info!("User-Agent: {:?}", headers);
     if let Ok(sku_option) = SkuDao::find_sku(&pool, &request.sku_code).await{
         let sku_response = ResponseFindSku::from_db_sku(sku_option);
-        Ok((StatusCode::OK,Json(ApiResponse::success(Some(sku_response)))))
+        Ok(Json(AppResponse::success(sku_response)))
     }else{
-        Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
+        // Err((StatusCode::INTERNAL_SERVER_ERROR,"Cannot execute FindSku::from_db_sku".to_string()))
+        Err(BusinessError::InternalServerError(
+            (Some("Cannot execute FindSku::from_db_sku".to_string()),None)
+        ))
     }
 }

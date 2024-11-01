@@ -10,7 +10,6 @@ use std::env;
 use std::sync::Arc;
 use crate::utils::cache::{CacheType,Expiration,CACHE};
 use crate::services_dependence::get_services_dependence_list;
-use crate::utils::load_balance;
 
 const REENABLE_DELAY_MS : u64 = 5000;//对于不可用的实例，超过这个时间，重置失败次数
 const MAX_FAILED_TIMES:usize = 15;//最大失败次数，超过这个次数，就不再尝试访问这个实例

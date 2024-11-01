@@ -2,7 +2,7 @@ use crate::model::request::operation::find_question_list_for_trad::FindQuestionL
 use crate::model::db::qa::Question;
 use crate::model::db::qa::Answer;
 use crate::model::db::qa::Page;
-use axum::http::StatusCode;
+use crate::utils::error::BusinessError;
 use sqlx::MySqlPool;
 use sqlx::QueryBuilder;
 pub struct QuestionDao;
@@ -12,7 +12,7 @@ impl QuestionDao{
     pub async fn insert_question(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question: &Question,
-    )->Result<u64, (StatusCode, String)>{
+    )->Result<u64, BusinessError>{
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!(
        "insert into rc_qa_question (
@@ -42,8 +42,7 @@ impl QuestionDao{
         );
         
         let result = query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "插入问题失败".to_string()))?;
+        .await?;
         let last_insert_id = result.last_insert_id();
 
         Ok(last_insert_id)
@@ -52,7 +51,7 @@ impl QuestionDao{
     pub async fn insert_answer(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         answer: &Answer,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
 
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!(
@@ -84,8 +83,7 @@ impl QuestionDao{
         );
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "插入问题失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -93,14 +91,13 @@ impl QuestionDao{
     pub async fn delete_answer(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
 
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("delete from rc_qa_answer where `question_code` = ?",question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "依据问题删除回答失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -108,7 +105,7 @@ impl QuestionDao{
     pub async fn update_question(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question: &Question,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
 
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("update rc_qa_question set `rank`= ?,`question_content` = ?,`update_time` = ?,`product_code`=? where `question_code` = ?",
@@ -120,8 +117,7 @@ impl QuestionDao{
         );
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "更新问题失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -130,17 +126,13 @@ impl QuestionDao{
     pub async fn find_question_by_question_code(
         pool: &MySqlPool,
         question_code: &String,
-    )->Result<Option<Question>, (StatusCode, String)>{
+    )->Result<Option<Question>, BusinessError>{
         // 执行查询操作，并忽略返回的结果
         let question = sqlx::query_as::<_,Question>(
             "select * from rc_qa_question where `question_code` = ? and status='1'",   
         ).bind(question_code)         
         .fetch_optional(pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("查询问题失败: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "查询问题失败".to_string())
-        })?;
+        .await?;
         Ok(question)
     }
 
@@ -148,14 +140,13 @@ impl QuestionDao{
     pub async fn delete_question_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
 
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("delete from rc_qa_question where `question_code` = ?",question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除问题失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -164,14 +155,13 @@ impl QuestionDao{
     pub async fn delete_answer_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
     
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("delete from rc_qa_answer where `question_code` = ?",question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除回答失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -179,11 +169,11 @@ impl QuestionDao{
     pub async fn delete_question_and_answer_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
-        let _ = QuestionDao::delete_question_by_question_code(transaction, question_code).await
-        .map_err(|_| "删除Answer失败".to_string());
-        let _ = QuestionDao::delete_answer_by_question_code(transaction, question_code).await
-        .map_err(|_| "删除Question失败".to_string());
+    )->Result<(), BusinessError>{
+        let _ = QuestionDao::delete_question_by_question_code(transaction, question_code).await?;
+        // .map_err(|_| "删除Answer失败".to_string());
+        let _ = QuestionDao::delete_answer_by_question_code(transaction, question_code).await?;
+        // .map_err(|_| "删除Question失败".to_string());
         Ok(())
     }
 
@@ -191,15 +181,14 @@ impl QuestionDao{
     pub async fn disabled_question_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
 
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("update rc_qa_question set `status`='0' 
         where `question_code` = ? and `status`='1'",question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除问题失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -208,14 +197,13 @@ impl QuestionDao{
     pub async fn disable_answer_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
     
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("update rc_qa_answer set `status`='0' where `question_code` = ? and `status`='1'",question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "删除回答失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -223,11 +211,9 @@ impl QuestionDao{
     pub async fn disabled_question_and_answer_by_question_code(
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code: &String,
-    )->Result<(), (StatusCode, String)>{
-        let _ = QuestionDao::disable_answer_by_question_code(transaction, question_code).await
-        .map_err(|_| "设置Answer失效失败".to_string());
-        let _ = QuestionDao::disabled_question_by_question_code(transaction, question_code).await
-        .map_err(|_| "设置Question失效失败".to_string());
+    )->Result<(), BusinessError>{
+        let _ = QuestionDao::disable_answer_by_question_code(transaction, question_code).await?;
+        let _ = QuestionDao::disabled_question_by_question_code(transaction, question_code).await?;
         Ok(())
     }
 
@@ -267,15 +253,9 @@ impl QuestionDao{
         request_find_question_list_for_trad: &RequestFindQuestionListForTrad, 
         current_pageno:i64,
         page_size:i64,    
-    )->Result<Page<Question>, (StatusCode, String)>{
+    )->Result<Page<Question>, BusinessError>{
         let total_records = Self::query_question_count(pool,request_find_question_list_for_trad).await?;
         let questions = Self::query_question_list_by_page(pool,request_find_question_list_for_trad,current_pageno,page_size).await?;
-        // let mut answers:HashMap<String,Vec<Answer>> = HashMap::new();
-        // for question in &questions{
-        //     let question_code = &question.question_code;
-        //     let answer_result = Self::query_answer_by_question_code(pool, question_code).await?;
-        //     answers.insert(question_code.to_string(), answer_result);
-        // }
         let page = Page::new(total_records, current_pageno, page_size, questions);
         return Ok(page);
     }
@@ -286,7 +266,7 @@ impl QuestionDao{
         request_find_question_list_for_trad: &RequestFindQuestionListForTrad, 
         current_pageno:i64,
         page_size:i64       
-    )->Result<Vec<Question>, (StatusCode, String)>{
+    )->Result<Vec<Question>, BusinessError>{
         tracing::info!("request_find_question_list_for_trad: {:?}", request_find_question_list_for_trad);
         let mut builder: QueryBuilder<'_, sqlx::MySql> = QueryBuilder::<sqlx::MySql>::new("select * from rc_qa_question where 1=1 ");
         Self::query_question_list_condition(&mut builder,request_find_question_list_for_trad);
@@ -296,8 +276,7 @@ impl QuestionDao{
         tracing::info!("sql: {:?}", sql);
         let query = builder.build_query_as::<Question>();
         let result = query.fetch_all(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("数据库错误： {}", e)))?;
+            .await?;
         Ok(result)
     }
 
@@ -305,33 +284,27 @@ impl QuestionDao{
     async fn query_question_count(
         pool: &MySqlPool,
         request_find_question_list_for_trad: &RequestFindQuestionListForTrad,        
-    )->Result<i64, (StatusCode, String)>{
+    )->Result<i64,BusinessError>{
         tracing::info!("request_find_question_list_for_trad: {:?}", request_find_question_list_for_trad);
         let mut builder: QueryBuilder<'_, sqlx::MySql> = QueryBuilder::<sqlx::MySql>::new("select count(1) as total_count from rc_qa_question where 1=1 ");
         Self::query_question_list_condition(&mut builder,request_find_question_list_for_trad);
 
         let query = builder.build_query_as::<(i64,)>();
         let result = query.fetch_one(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("数据库错误： {}", e)))?
-            .0;
-        Ok(result)
+            .await?;          
+        Ok(result.0)
     }
 
     /// 依据question_code查询回答记录
     pub async fn query_answer_by_question_code(
         pool: &MySqlPool,
         question_code: &String,
-    )->Result<Vec<Answer>, (StatusCode, String)>{
+    )->Result<Vec<Answer>, BusinessError>{
         let answer = sqlx::query_as::<_,Answer>(
             "select * from rc_qa_answer where `question_code` = ?",   
         ).bind(question_code)         
         .fetch_all(pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("查询回答失败: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "查询回答失败".to_string())
-        })?;
+        .await?;
         Ok(answer)
     }
 
@@ -339,13 +312,12 @@ impl QuestionDao{
         transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
         question_code:&String,
         sort:i32
-    )->Result<(), (StatusCode, String)>{
+    )->Result<(), BusinessError>{
         // 执行插入操作，并忽略返回的结果
         let query = sqlx::query!("update rc_qa_question set sort=? where question_code = ? and status=1",sort,question_code);
         
         query.execute(&mut **transaction)
-        .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "更新问题记录中的Sort(排序号)失败".to_string()))?;
+        .await?;
 
         Ok(())
     }
@@ -354,14 +326,12 @@ impl QuestionDao{
     /// 逻辑：查询数据库中当前最大sort值+1
     pub async fn have_next_sort(
         pool: &MySqlPool,      
-    )->Result<i32, (StatusCode, String)>{
+    )->Result<i32, BusinessError>{
         let mut builder: QueryBuilder<'_, sqlx::MySql> = QueryBuilder::<sqlx::MySql>::new("select max(sort)+1 as max_sort from rc_qa_question where 1=1 and status=1 ");
         let query = builder.build_query_as::<(i32,)>();
         let result = query.fetch_one(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("数据库错误： {}", e)))?
-            .0;
-        Ok(result)
+            .await?;
+        Ok(result.0)
     }
 }
 
@@ -460,7 +430,7 @@ mod test{
         //模拟查询
         let current_pageno = 1;
         let page_size = 10;
-        let result: Result<Vec<Question>, (StatusCode, String)> = QuestionDao::query_question_list_by_page(&pool,&request,current_pageno,page_size).await;
+        let result: Result<Vec<Question>, BusinessError> = QuestionDao::query_question_list_by_page(&pool,&request,current_pageno,page_size).await;
         tracing::info!("result: {:?}", result);
         let result = std::panic::catch_unwind(||{
             assert_eq!(result.is_ok(),true);
@@ -562,12 +532,12 @@ mod test{
         tracing::info!("test_query_question_list1 start");
         tracing::info!("pool: {:?}", pool);
 
-        let mut request = RequestFindQuestionListForTrad::new();
+        let request = RequestFindQuestionListForTrad::new();
         // request.product_code=Some("product_code".to_string());
         //模拟查询
         let current_pageno = 2;
         let page_size = 10;
-        let result: Result<Page<Question>, (StatusCode, String)> = QuestionDao::query_question_list(&pool,&request,current_pageno,page_size).await;
+        let result: Result<Page<Question>, BusinessError> = QuestionDao::query_question_list(&pool,&request,current_pageno,page_size).await;
         if let Err(e) = &result{
             tracing::error!("result: {:?}", e);
         }

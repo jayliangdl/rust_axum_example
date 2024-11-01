@@ -68,6 +68,24 @@ pub mod response_models{
             }
         }
     }
+
+    #[derive(Serialize,Debug)]
+    pub struct AppResponse<T>{
+        pub code:String,
+        pub msg:String,
+        pub success:bool,
+        pub data:T,
+    }
+    impl <T> AppResponse<T>{
+        pub fn success(data:T)->Self{
+            AppResponse{
+                code:"0".to_string(),
+                msg:"success".to_string(),
+                success:true,
+                data,
+            }
+        }
+    }
 }
 
 use serde::{Deserialize, Serialize};
@@ -112,69 +130,6 @@ impl<T> ApiResponse<T>{
             error_parameters,
             data
         }
-    }
-}
-
-
-
-
-
-// use serde::{Deserialize, Serialize};
-// #[derive(Serialize,Debug,Deserialize)]
-// pub struct ApiResponse<T>{
-//     pub code:String,
-//     pub msg:String,
-//     pub success:bool,        
-//     #[serde(rename = "requestId")]
-//     pub request_id:String,
-//     #[serde(skip_serializing_if = "Option::is_none")]
-//     pub data:Option<T>,
-//     #[serde(skip_serializing_if = "Option::is_none")]
-//     pub error_parameters:Option<serde_json::Value>,
-// }
-
-// impl<T> ApiResponse<T>{
-//     pub fn success(data:T)->ApiResponse<T>{
-//         ApiResponse{
-//             code:"0".to_string(),
-//             msg:"success".to_string(),
-//             request_id:uuid::Uuid::new_v4().to_string(),
-//             success:true,
-//             data:Some(data),
-//             error_parameters:None
-//         }
-//     }
-
-//     pub fn error(code:String,msg:String,error_parameters:Option<serde_json::Value>)->ApiResponse<T>{
-//         ApiResponse{
-//             request_id:uuid::Uuid::new_v4().to_string(),
-//             code,
-//             msg,
-//             success:false,
-//             data:None,
-//             error_parameters
-//         }
-//     }
-// }
-
-pub struct ErrorResponse<T: Clone>{
-    pub code:String,
-    pub msg:String,
-    pub success:bool,
-    pub error_parameters:Option<serde_json::Value>,
-    pub data:Option<T>,
-}
-
-impl<T: Clone> ErrorResponse<T>{
-    pub fn to_api_response(&self)->ApiResponse<T>{
-        let api_response = ApiResponse::error ( 
-            self.code.to_string(), 
-            self.msg.to_string(),             
-            self.error_parameters.clone(),
-            self.data.clone(),
-        );
-        api_response
-
     }
 }
 

@@ -1,10 +1,7 @@
-
 use serde::{Serialize,Deserialize};
 use validator::Validate;
-// use std::collections::HashMap;
 use crate::model::db::qa::Question as DbQuestion;
 use crate::model::db::qa::Answer as DbAnswer;
-// use crate::model::db::qa::Page as DbPage;
 
 #[derive(Serialize,Deserialize, Debug, Validate, Clone)]
 pub struct FindQuestionListForTrad {

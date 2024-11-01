@@ -11,10 +11,7 @@ use crate::model::db::sku::{
     Sku as DbSku
 };
 use crate::dao::sku_dao::SkuDao;
-use crate::utils::error::ErrorCode;
-use crate::model::response::operation::update_sku::UpdateSku as ResponseUpdateSku;
-use crate::models::ApiResponse;
-use crate::models::ErrorResponse;
+use crate::utils::error::BusinessError;
 
 #[derive(Deserialize,Debug, Validate)]
 pub struct UpdateSku{
@@ -27,32 +24,25 @@ pub struct UpdateSku{
 }
 
 impl UpdateSku{
-    pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), ApiResponse<ResponseUpdateSku>>{
-        if let Err(errors) = self.validate(){
-            let e: ApiResponse<ResponseUpdateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseUpdateSku>(errors,None);
-            return Err(e);
-        }
-        if let Err(error_response) = self.validate_not_found_sku(pool).await
-        { 
-
-            let api_response = error_response.to_api_response();
-            return Err(api_response);
-        }
+    pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), BusinessError>{
+        self.validate()?;
+        self.validate_not_found_sku(pool).await?;
         Ok(())
     }
 
     //校验sku是否存在    
-    async fn validate_not_found_sku(&self, pool:&MySqlPool)->Result<(),ErrorResponse<ResponseUpdateSku>>{
+    async fn validate_not_found_sku(&self, pool:&MySqlPool)->Result<(),BusinessError>{
         if let Ok(result) = SkuDao::find_sku(pool, &self.sku_code).await{
             if result.is_none(){
                 let mut parameters= HashMap::new();
-                parameters.insert("sku_code".to_string(), &self.sku_code);
-                let e = ErrorCode::SkuNotFound.to_error_response_from_parameters(parameters,None);
-                return Err(e);     
+                parameters.insert("sku_code".to_string(), self.sku_code.clone());
+                return Err(BusinessError::SkuNotFound(
+                    (None,Some(parameters))
+                ));   
             }
-        }else{
-            let e = ErrorCode::InternalServerError.to_error_response_without_parameters(None);
-            return Err(e);  
+        }
+        else{
+            return Err(BusinessError::InternalServerError((Some("校验sku是否存在-执行失败".to_string()),None)));            
         }
         Ok(())
     }

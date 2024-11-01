@@ -8,11 +8,8 @@ use crate::model::db::sku::{
     Sku as DbSku
 };
 use crate::model::request::operation::price::Price;
-use crate::models::ApiResponse;
-use crate::utils::error::ErrorCode;
+use crate::utils::error::BusinessError;
 use sqlx::MySqlPool;
-use crate::model::response::operation::create_sku::CreateSku as ResponseCreateSku;
-use crate::models::ErrorResponse;
 use crate::dao::sku_dao::SkuDao;
 
 #[derive(Deserialize, Debug, Validate)]
@@ -96,30 +93,25 @@ impl CreateSku{
         db_sku
     }
 
-    pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), ApiResponse<ResponseCreateSku>>{
-        if let Err(errors) = self.validate(){
-            let e: ApiResponse<ResponseCreateSku> = ErrorCode::InvalidParameter.to_response_from_validation_errors::<ResponseCreateSku>(errors,None);
-            return Err(e);
-        }
-        if let Err(error_response) = self.validate_alreay_exists_sku(pool).await
-        { 
-            let api_response = error_response.to_api_response();
-            return Err(api_response);
-        }
+    pub async fn custom_validate(&self,pool:&MySqlPool)->Result<(), BusinessError>{
+        self.validate()?;
+        self.validate_alreay_exists_sku(pool).await?;
         Ok(())
     }
     
-    async fn validate_alreay_exists_sku(&self,pool:&MySqlPool) -> Result<(),ErrorResponse<ResponseCreateSku>> {
+    async fn validate_alreay_exists_sku(&self,pool:&MySqlPool) -> Result<(),BusinessError> {
         if let Ok(result) = SkuDao::find_sku(pool, &self.sku_code).await{
             if result.is_some(){
                 let mut parameters= HashMap::new();
-                parameters.insert("sku_code".to_string(), &self.sku_code);
-                let e = ErrorCode::SkuAlreadyExists.to_error_response_from_parameters(parameters,None);
-                return Err(e);
+                parameters.insert("sku_code".to_string(), self.sku_code.clone());
+                return Err(BusinessError::SkuAlreadyExists(
+                    (None,Some(parameters))
+                ));
             }
         }else{
-            let e = ErrorCode::InternalServerError.to_error_response_without_parameters(None);
-            return Err(e);            
+            return Err(BusinessError::InternalServerError(
+                (None,None)
+            ));         
        }
         Ok(())
     }

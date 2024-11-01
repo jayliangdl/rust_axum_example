@@ -3,17 +3,15 @@ use tracing::info;
 use tracing::instrument;
 use axum::Extension;
 use sqlx::mysql::MySqlPool;
-use axum::{
-    http::StatusCode, Json
-};
+use axum::Json;
 
 use uuid::Uuid;
 use crate::models::request_models::CreateUser;
+use crate::models::response_models::AppResponse;
 use crate::models::response_models::User;
+use crate::utils::error::BusinessError;
 
-use crate::models::ApiResponse;
 use validator::Validate;
-use serde_json::json;
 
 fn create_user_sub(id:u64){
     info!("Created user sub with ID: {}", id);
@@ -23,7 +21,7 @@ fn create_user_sub(id:u64){
 pub async fn create_user(
     Extension(pool): Extension<MySqlPool>,
     Json(request): Json<CreateUser>,
-)-> Result<(StatusCode, Json<ApiResponse<User>>),(StatusCode,String)> {
+)-> Result<Json<AppResponse<User>>,BusinessError> {
 
     
     // let request_id = Uuid::new_v4(); // 生成唯一请求ID
@@ -32,15 +30,17 @@ pub async fn create_user(
     // create_request_span("create_user");
     // info!("request.price:{}",request.price.fractional_digit_count());
 
-    if let Err(errors) = request.validate(){
-        let error_response = ApiResponse::error(
-            "0201020".to_string(), 
-            "参数错误".to_string(),             
-            Some(json!(errors)),
-            None
-        );
-        return Ok((StatusCode::OK,Json(error_response)))
-    }
+    request.validate()?;
+
+    // if let Err(errors) = request.validate(){
+    //     let error_response = ApiResponse::error(
+    //         "0201020".to_string(), 
+    //         "参数错误".to_string(),             
+    //         Some(json!(errors)),
+    //         None
+    //     );
+    //     return Ok((StatusCode::OK,Json(error_response)))
+    // }
 
     let _ = sqlx::query!(
         "INSERT INTO users (name, age) VALUES (?, ?)",
@@ -48,8 +48,7 @@ pub async fn create_user(
         request.age
     )
     .execute(&pool)
-    .await
-    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR,"Failed to insert user".to_string()))?;
+    .await?;    
 
     let mut rng = rand::thread_rng();
     let id: u64 = rng.gen();
@@ -61,6 +60,6 @@ pub async fn create_user(
     info!("Created user with ID: {}", id);
     // this will be converted into a JSON response
     // with a status code of 201 Created
-    Ok((StatusCode::OK, Json(ApiResponse::success (Some(user)))))
+    Ok(Json(AppResponse::success(user)))
 }
 
