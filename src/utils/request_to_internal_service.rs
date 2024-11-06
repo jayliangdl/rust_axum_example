@@ -34,7 +34,7 @@ pub async fn request(service_name:&String,url:&String,method:&Method,body:&Strin
                     }
                 }
             }
-            return Err(format!("已达到重试上线"));
+            return Err(format!("已达到重试上限"));
         },
         _ => {
             return Err("Failed to get SERVICE_URL".to_string());

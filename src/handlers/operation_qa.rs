@@ -141,6 +141,7 @@ pub async fn find_question_list_for_trad(
     }
 }
 
+/// 将问题记录置顶
 #[instrument(name = "top_question", skip(params),fields(request_id = %Uuid::new_v4()))]
 pub async fn top_question(
     Extension(pool): Extension<MySqlPool>,
@@ -173,6 +174,7 @@ pub async fn top_question(
 
 }
 
+/// 取消置顶问题记录
 #[instrument(name = "cancel_top_question", skip(params),fields(request_id = %Uuid::new_v4()))]
 pub async fn cancel_top_question(
     Extension(pool): Extension<MySqlPool>,
@@ -205,12 +207,14 @@ pub async fn cancel_top_question(
 
 }
 
+/// 软删除问题记录（设置问题状态为失效）
 #[instrument(name = "disabled_question", fields(request_id = %Uuid::new_v4()))]
 pub async fn disabled_question(
     Extension(pool): Extension<MySqlPool>,
     TypedHeader(headers): TypedHeader<UserAgent>,
     Json(request): Json<RequestDeleteQuestion>,
 )-> Result<Json<AppResponse<bool>>,BusinessError> {
+    //参数较验
     request.validate()?;
     //先依据question_code查询数据库，确保question_code存在
     if let Ok(question_option) = QuestionDao::find_question_by_question_code(&pool, &request.question_code).await{
