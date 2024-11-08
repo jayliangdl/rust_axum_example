@@ -11,7 +11,8 @@ use tracing::{info, error};
 use std::env;
 use dotenv::dotenv;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
+use listenfd::ListenFd;
+use tokio::net::TcpListener;
 use rust_axum_example::utils::load_balance::fetch_load_balance_from_nacos;
 use rust_axum_example::utils::nacos;
 use rust_axum_example::utils::logging::init_log;
@@ -107,8 +108,31 @@ async fn main() {
     
 
     // 绑定监听器
-    let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    let addr = format!("0.0.0.0:{}", port);  
+
+    // 使用 listenfd 来监听文件描述符
+    let mut listenfd = ListenFd::from_env();
+    let listener = match listenfd.take_tcp_listener(0).unwrap() {
+        // if we are given a tcp listener on listen fd 0, we use that one
+        // 开发模式下，保存后不需要重启服务器，自动加载新的代码
+        // 启动命令例子：systemfd --no-pid -s http::3003 -- cargo watch -x run
+        Some(listener) => {
+            listener.set_nonblocking(true).unwrap();            
+            let listener = TcpListener::from_std(listener).unwrap();
+            info!("Running in development mode");
+            listener
+        }
+        // otherwise fall back to local listening
+        // 生产模式下，需要重启服务器
+        // 启动命令例子：cargo run
+        None => {
+            let listener = TcpListener::bind(&addr).await.unwrap();
+            info!("Running in production mode");
+            listener
+        }
+    };  
+
+    // let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     info!("Bound to {}", addr);
 
     // 启动 Web 服务器任务
